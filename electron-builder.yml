@@ -1,0 +1,27 @@
+appId: com.aiterminal.app
+productName: AITerminal
+copyright: Copyright © 2026 AITerminal
+
+directories:
+  output: out
+  buildResources: build
+
+files:
+  - dist/**/*
+  - package.json
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  darkModeSupport: true
+
+dmg:
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+
+electronVersion: null
+
+asar: true

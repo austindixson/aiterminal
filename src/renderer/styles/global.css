@@ -1,0 +1,103 @@
+/* ===== CSS Custom Properties (Theme) ===== */
+:root {
+  --terminal-bg: #1a1b26;
+  --terminal-fg: #c0caf5;
+  --terminal-cursor: #c0caf5;
+  --terminal-cursor-accent: #1a1b26;
+  --terminal-selection: rgba(130, 170, 255, 0.3);
+  --terminal-border: #292e42;
+  --terminal-scrollbar: rgba(192, 202, 245, 0.15);
+  --terminal-scrollbar-hover: rgba(192, 202, 245, 0.3);
+
+  --ansi-black: #15161e;
+  --ansi-red: #f7768e;
+  --ansi-green: #9ece6a;
+  --ansi-yellow: #e0af68;
+  --ansi-blue: #7aa2f7;
+  --ansi-magenta: #bb9af7;
+  --ansi-cyan: #7dcfff;
+  --ansi-white: #a9b1d6;
+  --ansi-bright-black: #414868;
+  --ansi-bright-red: #f7768e;
+  --ansi-bright-green: #9ece6a;
+  --ansi-bright-yellow: #e0af68;
+  --ansi-bright-blue: #7aa2f7;
+  --ansi-bright-magenta: #bb9af7;
+  --ansi-bright-cyan: #7dcfff;
+  --ansi-bright-white: #c0caf5;
+
+  --window-opacity: 0.95;
+  --window-blur: 20px;
+}
+
+/* ===== CSS Reset ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family:
+    "SF Mono",
+    "Cascadia Code",
+    "Fira Code",
+    "JetBrains Mono",
+    "Menlo",
+    "Consolas",
+    monospace;
+  background: transparent;
+  color: var(--terminal-fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+/* ===== Terminal Container ===== */
+#terminal-container {
+  flex: 1;
+  position: relative;
+  background-color: var(--terminal-bg);
+  opacity: var(--window-opacity);
+  -webkit-app-region: no-drag;
+}
+
+/* ===== xterm.js Overrides ===== */
+.xterm {
+  height: 100%;
+  width: 100%;
+  padding: 8px;
+}
+
+.xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--terminal-scrollbar);
+  border-radius: 4px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-scrollbar-hover);
+}
+
+/* ===== Selection ===== */
+::selection {
+  background: var(--terminal-selection);
+}

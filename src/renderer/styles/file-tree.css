@@ -1,0 +1,175 @@
+/* ===== File Tree Panel ===== */
+
+.file-tree-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 250px;
+  background-color: var(--terminal-bg);
+  opacity: var(--window-opacity);
+  border-right: 1px solid var(--terminal-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  font-size: 13px;
+  color: var(--terminal-fg);
+  -webkit-app-region: no-drag;
+  user-select: none;
+}
+
+/* ===== Header ===== */
+
+.file-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 12px;
+  border-bottom: 1px solid var(--terminal-border, rgba(255, 255, 255, 0.08));
+  min-height: 36px;
+  gap: 4px;
+}
+
+.file-tree-cwd {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.file-tree-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.file-tree-btn {
+  background: transparent;
+  border: none;
+  color: var(--terminal-fg);
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 150ms ease, background-color 150ms ease;
+}
+
+.file-tree-btn:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ===== Entries container (scrollable) ===== */
+
+.file-tree-entries {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+
+.file-tree-entries::-webkit-scrollbar {
+  width: 6px;
+}
+
+.file-tree-entries::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.file-tree-entries::-webkit-scrollbar-thumb {
+  background: var(--terminal-scrollbar, rgba(192, 202, 245, 0.15));
+  border-radius: 3px;
+}
+
+.file-tree-entries::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-scrollbar-hover, rgba(192, 202, 245, 0.3));
+}
+
+/* ===== Individual entry ===== */
+
+.file-tree-entry {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 3px;
+  margin: 0 4px;
+  transition: background-color 120ms ease;
+}
+
+.file-tree-entry:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.file-tree-entry--selected {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.file-tree-entry--selected:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.file-tree-entry--directory {
+  font-weight: 500;
+}
+
+/* ===== Expand/collapse toggle arrow ===== */
+
+.file-tree-toggle {
+  width: 16px;
+  text-align: center;
+  font-size: 10px;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 120ms ease;
+}
+
+.file-tree-entry:hover .file-tree-toggle {
+  opacity: 0.9;
+}
+
+/* ===== Icon ===== */
+
+.file-tree-icon {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+/* ===== File name ===== */
+
+.file-tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== Children container (animated) ===== */
+
+.file-tree-children {
+  overflow: hidden;
+  animation: file-tree-expand 150ms ease-out;
+}
+
+@keyframes file-tree-expand {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
+  }
+}
