@@ -63,7 +63,7 @@ export const ThemeSelector: FC = () => {
         onClick={handleToggle}
         aria-label="Theme selector"
       >
-        &#x1F3A8;
+        &#x25D0;
       </button>
 
       {isOpen && (

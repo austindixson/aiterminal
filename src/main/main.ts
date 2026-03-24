@@ -3,9 +3,13 @@
  * initializes the AI client, and wires all IPC handlers.
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { config } from 'dotenv';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { app, BrowserWindow, ipcMain } from 'electron';
+
+// Load .env from project root before anything else
+// __dirname is dist/main/main/ so we go up 3 levels to project root
+config({ path: join(__dirname, '../../../.env') });
 import * as pty from 'node-pty';
 import { OpenRouterClient } from '../ai/openrouter-client.js';
 import { setupAllHandlers } from './ipc-handlers.js';
@@ -15,7 +19,7 @@ import type { PtyBridge } from './ipc-handlers.js';
 // Path helpers
 // ---------------------------------------------------------------------------
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
+// __dirname is available natively in CommonJS
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const DEV_SERVER_URL = 'http://localhost:5173';
@@ -25,11 +29,22 @@ const RENDERER_PATH = join(__dirname, '../renderer/index.html');
 // AI client configuration
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = [
-  'You are AITerminal, an AI assistant embedded in a terminal emulator.',
-  'You help users with shell commands, code explanations, and error diagnosis.',
-  'Be concise. Prefer actionable answers. When suggesting commands, use code blocks.',
-].join(' ');
+const SYSTEM_PROMPT = `You are AITerminal, an AI assistant embedded in a terminal emulator on macOS (zsh).
+
+CRITICAL RULE: When the user's intent maps to a shell command, you MUST auto-execute it.
+Wrap any command you want to run in [RUN]command[/RUN] tags. The terminal will execute it automatically.
+
+Examples:
+- User: "take me to desktop" → [RUN]cd ~/Desktop[/RUN]
+- User: "show my files" → [RUN]ls -la[/RUN]
+- User: "what's my ip" → [RUN]curl -s ifconfig.me[/RUN]
+- User: "make a folder called projects" → [RUN]mkdir -p ~/projects[/RUN]
+
+For DESTRUCTIVE commands (rm, kill, drop, etc.), do NOT auto-execute. Instead explain and let the user decide.
+
+For questions/explanations that don't need a command, just respond naturally without [RUN] tags.
+
+Be extremely concise. 1-2 sentences max unless the user asks for detail.`;
 
 function createAIClient(): OpenRouterClient | null {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -53,16 +68,33 @@ function createAIClient(): OpenRouterClient | null {
 // PTY spawn
 // ---------------------------------------------------------------------------
 
-function spawnPty(): pty.IPty {
+function spawnPty(): pty.IPty | null {
   const shell = process.env.SHELL || '/bin/zsh';
 
-  return pty.spawn(shell, [], {
-    name: 'xterm-256color',
-    cols: 80,
-    rows: 24,
-    cwd: process.env.HOME || '/',
-    env: process.env as Record<string, string>,
-  });
+  try {
+    return pty.spawn(shell, [], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: process.env.HOME || '/',
+      env: process.env as Record<string, string>,
+    });
+  } catch (err) {
+    console.error('[main] Failed to spawn PTY:', err);
+    console.error('[main] Trying with /bin/zsh directly...');
+    try {
+      return pty.spawn('/bin/zsh', [], {
+        name: 'xterm-256color',
+        cols: 80,
+        rows: 24,
+        cwd: process.env.HOME || '/',
+        env: process.env as Record<string, string>,
+      });
+    } catch (err2) {
+      console.error('[main] PTY spawn failed entirely:', err2);
+      return null;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -90,10 +122,21 @@ function createWindow(): BrowserWindow {
 
   if (IS_DEV) {
     window.loadURL(DEV_SERVER_URL);
-    window.webContents.openDevTools({ mode: 'detach' });
+    // Don't auto-open DevTools — use Cmd+Option+I to toggle
   } else {
     window.loadFile(RENDERER_PATH);
   }
+
+  // Register Cmd+Option+I to toggle DevTools (docked bottom, not detached)
+  window.webContents.on('before-input-event', (_event, input) => {
+    if (input.meta && input.alt && input.key === 'i') {
+      if (window.webContents.isDevToolsOpened()) {
+        window.webContents.closeDevTools();
+      } else {
+        window.webContents.openDevTools({ mode: 'bottom' });
+      }
+    }
+  });
 
   return window;
 }
@@ -113,7 +156,16 @@ app.whenReady().then(() => {
   // create a stub that returns helpful error messages.
   const client = aiClient ?? createStubAIClient();
 
-  ptyBridge = setupAllHandlers(ipcMain, window, ptyProcess, client);
+  if (ptyProcess) {
+    ptyBridge = setupAllHandlers(ipcMain, window, ptyProcess, client);
+
+    // Clear the terminal after shell init to remove garbled startup output
+    setTimeout(() => {
+      ptyProcess.write('clear\r');
+    }, 500);
+  } else {
+    console.warn('[main] Running without PTY — terminal commands will not work.');
+  }
 
   // Clean up PTY when the window closes
   window.on('closed', () => {
@@ -129,7 +181,9 @@ app.whenReady().then(() => {
       const newPty = spawnPty();
       const newClient = createAIClient() ?? createStubAIClient();
 
-      ptyBridge = setupAllHandlers(ipcMain, newWindow, newPty, newClient);
+      if (newPty) {
+        ptyBridge = setupAllHandlers(ipcMain, newWindow, newPty, newClient);
+      }
 
       newWindow.on('closed', () => {
         if (ptyBridge) {

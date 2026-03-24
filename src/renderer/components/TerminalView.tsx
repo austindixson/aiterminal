@@ -10,6 +10,7 @@ import { themeToXtermOptions } from '@/themes/theme-manager'
 
 export interface TerminalViewProps {
   readonly onCommand: (input: string) => void
+  readonly onPtyOutput?: (data: string) => void
   readonly theme: Theme
 }
 
@@ -17,10 +18,14 @@ export interface TerminalViewProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, theme }) => {
+export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutput, theme }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const inputBufferRef = useRef<string>('')
+  const onCommandRef = useRef(onCommand)
+  const onPtyOutputRef = useRef(onPtyOutput)
+  onCommandRef.current = onCommand
+  onPtyOutputRef.current = onPtyOutput
 
   useEffect(() => {
     const container = containerRef.current
@@ -50,31 +55,48 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, theme }) 
       // FitAddon.fit() can throw if container has zero dimensions (e.g., in tests)
     }
 
-    // Buffer keystrokes and fire onCommand on Enter
+    // Check if electronAPI is available (not in tests)
+    const hasElectronAPI = typeof window !== 'undefined' && 'electronAPI' in window
+
+    // Receive PTY output → write to xterm display + forward to parent
+    if (hasElectronAPI) {
+      window.electronAPI.onPtyData((data: string) => {
+        terminal.write(data)
+        onPtyOutputRef.current?.(data)
+      })
+    }
+
+    // Send keystrokes to PTY AND track input buffer for AI routing
     const dataDisposable = terminal.onData((data: string) => {
+      // Track the current line for AI detection on Enter
       if (data === '\r' || data === '\n') {
         const command = inputBufferRef.current
         inputBufferRef.current = ''
-        terminal.write('\r\n')
         if (command.length > 0) {
-          onCommand(command)
+          onCommandRef.current(command)
         }
       } else if (data === '\x7f') {
-        // Backspace
+        // Backspace — update buffer
         if (inputBufferRef.current.length > 0) {
           inputBufferRef.current = inputBufferRef.current.slice(0, -1)
-          terminal.write('\b \b')
         }
       } else {
         inputBufferRef.current += data
-        terminal.write(data)
+      }
+
+      // Forward ALL keystrokes to PTY (PTY handles echo, not us)
+      if (hasElectronAPI) {
+        window.electronAPI.writeToPty(data)
       }
     })
 
-    // Handle resize
+    // Handle resize — sync xterm AND PTY dimensions
     const handleResize = () => {
       try {
         fitAddon.fit()
+        if (hasElectronAPI && terminal.cols && terminal.rows) {
+          window.electronAPI.resizePty(terminal.cols, terminal.rows)
+        }
       } catch {
         // Ignore fit errors during resize
       }
@@ -90,6 +112,9 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, theme }) 
     terminalRef.current = terminal
     terminal.focus()
 
+    // Initial resize sync
+    handleResize()
+
     return () => {
       resizeObserver.disconnect()
       window.removeEventListener('resize', handleResize)
@@ -97,7 +122,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, theme }) 
       terminal.dispose()
       terminalRef.current = null
     }
-  }, [theme, onCommand])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme])
 
   return (
     <div

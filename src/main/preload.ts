@@ -9,13 +9,32 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ElectronAPI } from '../types/index.js';
 
+// ---------------------------------------------------------------------------
+// PTY data buffering
+// ---------------------------------------------------------------------------
+// The shell prompt arrives from PTY before xterm.js mounts and registers its
+// onPtyData listener. We buffer all incoming PTY data in the preload layer and
+// flush it once the renderer explicitly subscribes via onPtyData.
+// ---------------------------------------------------------------------------
+
+let ptyBuffer: string[] = [];
+let ptyCallback: ((data: string) => void) | null = null;
+
+ipcRenderer.on('pty-data', (_event, data: string) => {
+  if (ptyCallback) {
+    ptyCallback(data);
+  } else {
+    ptyBuffer.push(data);
+  }
+});
+
 const electronAPI: ElectronAPI = {
   // --- Command execution ---
   executeCommand: (command: string) =>
     ipcRenderer.invoke('execute-command', command),
 
   // --- AI queries ---
-  aiQuery: (request: { prompt: string; taskType: string; context?: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> }) =>
+  aiQuery: (request) =>
     ipcRenderer.invoke('ai-query', request),
 
   // --- Theme management ---
@@ -30,9 +49,12 @@ const electronAPI: ElectronAPI = {
 
   // --- PTY bridge ---
   onPtyData: (callback: (data: string) => void) => {
-    ipcRenderer.on('pty-data', (_event, data: string) => {
+    ptyCallback = callback;
+    // Flush any data that arrived before the renderer was ready
+    for (const data of ptyBuffer) {
       callback(data);
-    });
+    }
+    ptyBuffer = [];
   },
 
   writeToPty: (data: string) => {

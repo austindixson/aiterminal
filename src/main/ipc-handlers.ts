@@ -7,12 +7,12 @@
  */
 
 import type { IpcMain, BrowserWindow } from 'electron';
-import type { IAIClient } from '@/ai/client';
-import type { AIRequest, AIResponse, ContextMessage } from '@/ai/types';
-import type { CommandResult } from '@/types/index';
-import type { Theme, ThemeConfig } from '@/themes/types';
-import { ThemeManager, serializeThemeConfig } from '@/themes/theme-manager';
-import { readDirectory, readDirectoryTree } from '@/file-tree/file-tree-service';
+import type { IAIClient } from '../ai/client';
+import type { AIRequest, AIResponse, ContextMessage } from '../ai/types';
+import type { CommandResult } from '../types/index';
+import type { Theme, ThemeConfig } from '../themes/types';
+import { ThemeManager, serializeThemeConfig } from '../themes/theme-manager';
+import { readDirectory, readDirectoryTree } from '../file-tree/file-tree-service';
 
 // ---------------------------------------------------------------------------
 // PTY interface (matches the subset of node-pty's IPty we use)

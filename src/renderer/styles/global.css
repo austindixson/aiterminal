@@ -1,87 +1,138 @@
-/* ===== CSS Custom Properties (Theme) ===== */
-:root {
-  --terminal-bg: #1a1b26;
-  --terminal-fg: #c0caf5;
-  --terminal-cursor: #c0caf5;
-  --terminal-cursor-accent: #1a1b26;
-  --terminal-selection: rgba(130, 170, 255, 0.3);
-  --terminal-border: #292e42;
-  --terminal-scrollbar: rgba(192, 202, 245, 0.15);
-  --terminal-scrollbar-hover: rgba(192, 202, 245, 0.3);
+/* ===================================================================
+   global.css — AITerminal core styles
+   =================================================================== */
 
-  --ansi-black: #15161e;
-  --ansi-red: #f7768e;
-  --ansi-green: #9ece6a;
-  --ansi-yellow: #e0af68;
-  --ansi-blue: #7aa2f7;
-  --ansi-magenta: #bb9af7;
-  --ansi-cyan: #7dcfff;
-  --ansi-white: #a9b1d6;
-  --ansi-bright-black: #414868;
-  --ansi-bright-red: #f7768e;
-  --ansi-bright-green: #9ece6a;
-  --ansi-bright-yellow: #e0af68;
-  --ansi-bright-blue: #7aa2f7;
-  --ansi-bright-magenta: #bb9af7;
-  --ansi-bright-cyan: #7dcfff;
-  --ansi-bright-white: #c0caf5;
+:root {
+  --terminal-bg: #282a36;
+  --terminal-fg: #f8f8f2;
+  --terminal-cursor: #f8f8f2;
+  --terminal-cursor-accent: #282a36;
+  --terminal-selection: rgba(189, 147, 249, 0.25);
+
+  --ansi-black: #21222c;
+  --ansi-red: #ff5555;
+  --ansi-green: #50fa7b;
+  --ansi-yellow: #f1fa8c;
+  --ansi-blue: #bd93f9;
+  --ansi-magenta: #ff79c6;
+  --ansi-cyan: #8be9fd;
+  --ansi-white: #f8f8f2;
+  --ansi-bright-black: #6272a4;
+  --ansi-bright-red: #ff6e6e;
+  --ansi-bright-green: #69ff94;
+  --ansi-bright-yellow: #ffffa5;
+  --ansi-bright-blue: #d6acff;
+  --ansi-bright-magenta: #ff92df;
+  --ansi-bright-cyan: #a4ffff;
+  --ansi-bright-white: #ffffff;
 
   --window-opacity: 0.95;
   --window-blur: 20px;
+
+  --glass-bg: rgba(40, 42, 54, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-accent: rgba(189, 147, 249, 0.2);
+  --accent-gradient: linear-gradient(135deg, var(--ansi-blue), var(--ansi-magenta));
+
+  --titlebar-height: 38px;
+  --statusbar-height: 28px;
 }
 
-/* ===== CSS Reset ===== */
-*,
-*::before,
-*::after {
+/* Reset */
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html,
-body,
-#root {
+html, body, #root {
   height: 100%;
   width: 100%;
   overflow: hidden;
 }
 
 body {
-  font-family:
-    "SF Mono",
-    "Cascadia Code",
-    "Fira Code",
-    "JetBrains Mono",
-    "Menlo",
-    "Consolas",
-    monospace;
-  background: transparent;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", "Menlo", "Consolas", monospace;
+  background: var(--terminal-bg);
   color: var(--terminal-fg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  user-select: none;
+  text-rendering: optimizeLegibility;
+}
+
+/* Titlebar drag region */
+.titlebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-height);
   -webkit-app-region: drag;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 
-/* ===== Terminal Container ===== */
-#terminal-container {
-  flex: 1;
-  position: relative;
-  background-color: var(--terminal-bg);
-  opacity: var(--window-opacity);
-  -webkit-app-region: no-drag;
+.titlebar__title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ansi-bright-black);
+  letter-spacing: 0.02em;
+  user-select: none;
 }
 
-/* ===== xterm.js Overrides ===== */
+/* Status bar */
+.statusbar {
+  height: var(--statusbar-height);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255,255,255,0.04);
+  font-size: 11px;
+  color: var(--ansi-bright-black);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.statusbar__item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.statusbar__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ansi-green);
+  box-shadow: 0 0 6px rgba(80, 250, 123, 0.4);
+}
+
+.statusbar__dot--ai {
+  background: var(--ansi-blue);
+  box-shadow: 0 0 6px rgba(189, 147, 249, 0.4);
+}
+
+.statusbar__separator {
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* xterm overrides */
 .xterm {
   height: 100%;
   width: 100%;
-  padding: 8px;
+  padding: 4px 0 0 8px;
 }
 
 .xterm-viewport::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .xterm-viewport::-webkit-scrollbar-track {
@@ -89,15 +140,25 @@ body {
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb {
-  background: var(--terminal-scrollbar);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: var(--terminal-scrollbar-hover);
+  background: rgba(255, 255, 255, 0.15);
 }
 
-/* ===== Selection ===== */
+/* Window vignette */
+#root::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), inset 0 0 60px rgba(0,0,0,0.12);
+  border-radius: 10px;
+}
+
 ::selection {
   background: var(--terminal-selection);
 }

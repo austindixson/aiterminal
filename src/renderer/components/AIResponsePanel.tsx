@@ -23,7 +23,11 @@ export const AIResponsePanel: FC<AIResponsePanelProps> = ({
   if (isLoading) {
     return (
       <div className="ai-loading" data-testid="ai-loading-spinner">
-        <div className="ai-loading__spinner" />
+        <div className="ai-loading__dots">
+          <span className="ai-loading__dot" />
+          <span className="ai-loading__dot" />
+          <span className="ai-loading__dot" />
+        </div>
         <span>Thinking...</span>
       </div>
     )
@@ -34,20 +38,29 @@ export const AIResponsePanel: FC<AIResponsePanelProps> = ({
   }
 
   const totalTokens = response.inputTokens + response.outputTokens
+  const hasStats = response.model && response.model !== '' && response.model !== 'error'
 
   return (
     <div className="ai-response-panel" data-testid="ai-response-card">
       <div className="ai-response-panel__header">
         <div className="ai-response-panel__meta" data-testid="ai-response-meta">
-          <span className="model-badge" data-testid="model-badge">
-            {response.model}
-          </span>
-          <span className="token-info" data-testid="token-info">
-            {totalTokens} tokens
-          </span>
-          <span className="latency-info" data-testid="latency-info">
-            {response.latencyMs}ms
-          </span>
+          {hasStats && (
+            <>
+              <span className="model-badge" data-testid="model-badge">
+                {response.model}
+              </span>
+              {totalTokens > 0 && (
+                <span className="token-info" data-testid="token-info">
+                  {totalTokens} tokens
+                </span>
+              )}
+              {response.latencyMs > 0 && (
+                <span className="latency-info" data-testid="latency-info">
+                  {response.latencyMs}ms
+                </span>
+              )}
+            </>
+          )}
         </div>
         <button
           type="button"
