@@ -1,0 +1,266 @@
+/* ===================================================================
+   diff.css — Diff View panel styles for AITerminal
+   =================================================================== */
+
+/* Full panel — glass morphism */
+.diff-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  backdrop-filter: blur(var(--window-blur));
+  -webkit-backdrop-filter: blur(var(--window-blur));
+  overflow: hidden;
+}
+
+/* Header */
+.diff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+.diff-header__info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.diff-header__path {
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", "Menlo", "Consolas", monospace;
+  font-size: 12px;
+  color: var(--terminal-fg);
+  font-weight: 500;
+}
+
+.diff-close-btn {
+  background: none;
+  border: none;
+  color: var(--ansi-bright-black);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.diff-close-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--terminal-fg);
+}
+
+/* Stats badges: "+N" green, "-N" red */
+.diff-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", "Menlo", "Consolas", monospace;
+  font-size: 11px;
+}
+
+.diff-stats__additions {
+  color: var(--ansi-green);
+  font-weight: 600;
+}
+
+.diff-stats__deletions {
+  color: var(--ansi-red);
+  font-weight: 600;
+}
+
+/* File tab bar */
+.diff-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--glass-border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.diff-tabs::-webkit-scrollbar {
+  height: 3px;
+}
+
+.diff-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+
+.diff-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ansi-bright-black);
+  cursor: pointer;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", "Menlo", "Consolas", monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.diff-tab:hover {
+  color: var(--terminal-fg);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.diff-tab--active {
+  color: var(--terminal-fg);
+  border-bottom-color: var(--ansi-blue);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Scrollable content area */
+.diff-content-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", "Menlo", "Consolas", monospace;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.diff-content-area::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.diff-content-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.diff-content-area::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+.diff-content-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Single diff line row */
+.diff-line {
+  display: flex;
+  align-items: stretch;
+  min-height: 20px;
+  border-left: 3px solid transparent;
+}
+
+/* Added line — green */
+.diff-line--added {
+  background: rgba(80, 250, 123, 0.1);
+  border-left-color: var(--ansi-green);
+}
+
+/* Removed line — red */
+.diff-line--removed {
+  background: rgba(255, 85, 85, 0.1);
+  border-left-color: var(--ansi-red);
+}
+
+/* Unchanged line — normal */
+.diff-line--unchanged {
+  background: transparent;
+  border-left-color: transparent;
+}
+
+/* Header line (e.g., @@ -1,3 +1,4 @@) */
+.diff-line--header {
+  background: rgba(189, 147, 249, 0.06);
+  border-left-color: var(--ansi-blue);
+  color: var(--ansi-bright-black);
+  font-style: italic;
+}
+
+/* Line number gutters */
+.diff-gutter {
+  display: inline-block;
+  width: 40px;
+  min-width: 40px;
+  padding: 0 6px;
+  text-align: right;
+  color: var(--ansi-bright-black);
+  opacity: 0.5;
+  user-select: none;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-gutter--old {
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.diff-gutter--new {
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Code content */
+.diff-content {
+  flex: 1;
+  padding: 0 8px;
+  white-space: pre;
+  color: var(--terminal-fg);
+}
+
+.diff-line--removed .diff-content {
+  color: var(--ansi-red);
+}
+
+.diff-line--added .diff-content {
+  color: var(--ansi-green);
+}
+
+/* Accept / Reject controls */
+.diff-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+.diff-controls__btn {
+  padding: 5px 16px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Accept — green */
+.diff-controls__btn--accept {
+  background: rgba(80, 250, 123, 0.15);
+  border-color: rgba(80, 250, 123, 0.3);
+  color: var(--ansi-green);
+}
+
+.diff-controls__btn--accept:hover {
+  background: rgba(80, 250, 123, 0.25);
+  box-shadow: 0 0 8px rgba(80, 250, 123, 0.2);
+}
+
+/* Reject — red */
+.diff-controls__btn--reject {
+  background: rgba(255, 85, 85, 0.15);
+  border-color: rgba(255, 85, 85, 0.3);
+  color: var(--ansi-red);
+}
+
+.diff-controls__btn--reject:hover {
+  background: rgba(255, 85, 85, 0.25);
+  box-shadow: 0 0 8px rgba(255, 85, 85, 0.2);
+}

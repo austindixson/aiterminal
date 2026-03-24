@@ -3,9 +3,11 @@ import type { FC } from 'react'
 import type { AIResponse } from '@/ai/types'
 import type { AIQueryRequest } from '@/types/index'
 import { useTheme } from '@/renderer/hooks/useTheme'
+import { useCmdK } from '@/renderer/hooks/useCmdK'
 import { isNaturalLanguage, buildAIPrompt } from '@/shell/shell-service'
 import { TerminalView } from '@/renderer/components/TerminalView'
 import { AIResponsePanel } from '@/renderer/components/AIResponsePanel'
+import { CmdKBar } from '@/renderer/components/CmdKBar'
 import { ThemeSelector } from '@/renderer/components/ThemeSelector'
 
 function classifyNaturalLanguage(input: string): 'code_explain' | 'general' {
@@ -51,6 +53,19 @@ export const App: FC = () => {
   const { activeTheme } = useTheme()
   const [aiResponse, setAIResponse] = useState<AIResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const cmdK = useCmdK()
+
+  // Global Cmd+K keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        cmdK.toggle()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [cmdK.toggle])
 
   const handleDismiss = useCallback(() => {
     setAIResponse(null)
@@ -169,6 +184,15 @@ export const App: FC = () => {
           />
         </div>
       )}
+
+      {/* Cmd+K inline AI bar */}
+      <CmdKBar
+        state={cmdK.state}
+        onClose={cmdK.close}
+        onSubmit={cmdK.submit}
+        onQueryChange={cmdK.setQuery}
+        onNavigateHistory={cmdK.navigateHistory}
+      />
 
       {/* Status bar */}
       <div className="statusbar">

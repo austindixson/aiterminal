@@ -1,4 +1,5 @@
 import type { FileEntry } from './file-tree'
+import type { AutocompleteContext } from './autocomplete'
 
 /** Terminal color theme definition */
 export interface Theme {
@@ -52,6 +53,12 @@ export interface RouterPreset {
   readonly models: Readonly<Record<string, ModelConfig>>;
 }
 
+/** Result of reading a file for the preview pane */
+export interface FileReadResult {
+  readonly content: string;
+  readonly size: number;
+}
+
 /** IPC channel names for type-safe communication */
 export type IpcChannel =
   | "execute-command"
@@ -63,7 +70,11 @@ export type IpcChannel =
   | "write-to-pty"
   | "resize-pty"
   | "read-directory"
-  | "read-directory-tree";
+  | "read-directory-tree"
+  | "read-file"
+  | "write-file"
+  | "delete-file"
+  | "get-autocomplete-context";
 
 /** AI query request shape from the renderer */
 export interface AIQueryRequest {
@@ -73,6 +84,12 @@ export interface AIQueryRequest {
 }
 
 /** Electron API exposed via contextBridge */
+/** Result of a file write/delete operation */
+export interface FileWriteResult {
+  readonly success: boolean;
+  readonly error?: string;
+}
+
 export interface ElectronAPI {
   executeCommand: (command: string) => Promise<CommandResult>;
   aiQuery: (request: AIQueryRequest) => Promise<AIResponse>;
@@ -84,6 +101,10 @@ export interface ElectronAPI {
   resizePty: (cols: number, rows: number) => void;
   readDirectory: (dirPath: string) => Promise<ReadonlyArray<FileEntry>>;
   readDirectoryTree: (dirPath: string, depth: number) => Promise<ReadonlyArray<FileEntry>>;
+  readFile: (filePath: string) => Promise<FileReadResult>;
+  writeFile: (filePath: string, content: string) => Promise<FileWriteResult>;
+  deleteFile: (filePath: string) => Promise<FileWriteResult>;
+  getAutocompleteContext: () => Promise<{ cwd: string; recentCommands: ReadonlyArray<string> }>;
 }
 
 /** Augment the Window interface for preload */

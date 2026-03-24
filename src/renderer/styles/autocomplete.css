@@ -1,0 +1,131 @@
+/* ===================================================================
+   autocomplete.css — AI Autocomplete dropdown styling
+   =================================================================== */
+
+/* ===== Animations ===== */
+
+@keyframes autocompleteIn {
+  from {
+    opacity: 0;
+    transform: scaleY(0.9) translateY(4px);
+    transform-origin: bottom left;
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+    transform-origin: bottom left;
+  }
+}
+
+@keyframes autocompleteDots {
+  0%, 20% { opacity: 0.3; }
+  40% { opacity: 1; }
+  60%, 100% { opacity: 0.3; }
+}
+
+/* ===== Dropdown container ===== */
+
+.autocomplete-dropdown {
+  position: absolute;
+  z-index: 800;
+  min-width: 280px;
+  max-width: 480px;
+  max-height: 320px;
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 4px;
+  animation: autocompleteIn 0.15s ease-out;
+}
+
+/* ===== Suggestion item ===== */
+
+.autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  user-select: none;
+}
+
+.autocomplete-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ===== Selected state ===== */
+
+.autocomplete-item--selected {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.autocomplete-item--selected:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ===== Type icon ===== */
+
+.autocomplete-item__icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+}
+
+/* ===== Completion text ===== */
+
+.autocomplete-item__text {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== Description ===== */
+
+.autocomplete-item__desc {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+/* ===== Loading indicator ===== */
+
+.autocomplete-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+}
+
+.autocomplete-loading__dots {
+  letter-spacing: 3px;
+  animation: autocompleteDots 1.2s ease-in-out infinite;
+}

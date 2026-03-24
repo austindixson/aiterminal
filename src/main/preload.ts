@@ -71,6 +71,21 @@ const electronAPI: ElectronAPI = {
 
   readDirectoryTree: (dirPath: string, depth: number) =>
     ipcRenderer.invoke('read-directory-tree', dirPath, depth),
+
+  // --- File preview ---
+  readFile: (filePath: string) =>
+    ipcRenderer.invoke('read-file', filePath),
+
+  // --- Agent file operations ---
+  writeFile: (filePath: string, content: string) =>
+    ipcRenderer.invoke('write-file', filePath, content),
+
+  deleteFile: (filePath: string) =>
+    ipcRenderer.invoke('delete-file', filePath),
+
+  // --- Autocomplete ---
+  getAutocompleteContext: () =>
+    ipcRenderer.invoke('get-autocomplete-context'),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

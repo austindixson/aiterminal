@@ -1,0 +1,42 @@
+/**
+ * Types for the Chat Sidebar feature.
+ *
+ * Defines message shapes, file attachments, sidebar state,
+ * and conversation persistence types.
+ *
+ * All types are immutable (readonly) to prevent accidental mutation.
+ */
+
+export interface ChatMessage {
+  readonly id: string
+  readonly role: 'user' | 'assistant' | 'system'
+  readonly content: string
+  readonly timestamp: number
+  readonly model?: string
+  readonly isStreaming?: boolean
+  readonly attachments?: ReadonlyArray<FileAttachment>
+}
+
+export interface FileAttachment {
+  readonly path: string
+  readonly name: string
+  readonly content?: string    // loaded on demand
+  readonly language?: string   // for syntax highlighting
+}
+
+export interface ChatState {
+  readonly isOpen: boolean
+  readonly width: number           // sidebar width in px
+  readonly messages: ReadonlyArray<ChatMessage>
+  readonly inputValue: string
+  readonly isStreaming: boolean
+  readonly attachedFiles: ReadonlyArray<FileAttachment>
+}
+
+export interface ChatConversation {
+  readonly id: string
+  readonly title: string
+  readonly messages: ReadonlyArray<ChatMessage>
+  readonly createdAt: number
+  readonly updatedAt: number
+}

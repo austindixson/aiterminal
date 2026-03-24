@@ -13,6 +13,7 @@ import type { CommandResult } from '../types/index';
 import type { Theme, ThemeConfig } from '../themes/types';
 import { ThemeManager, serializeThemeConfig } from '../themes/theme-manager';
 import { readDirectory, readDirectoryTree } from '../file-tree/file-tree-service';
+import * as fs from 'node:fs/promises';
 
 // ---------------------------------------------------------------------------
 // PTY interface (matches the subset of node-pty's IPty we use)
@@ -294,6 +295,48 @@ export function setupAllHandlers(
 
   ipc.handle('read-directory-tree', (_event, dirPath: string, depth: number) => {
     return readDirectoryTree(dirPath, depth);
+  });
+
+  // File preview
+  ipc.handle('read-file', async (_event, filePath: string) => {
+    const [content, stat] = await Promise.all([
+      fs.readFile(filePath, 'utf-8'),
+      fs.stat(filePath),
+    ]);
+    return { content, size: stat.size };
+  });
+
+  // Agent file operations
+  ipc.handle('write-file', async (_event, filePath: string, content: string) => {
+    try {
+      const dir = filePath.substring(0, filePath.lastIndexOf('/'));
+      if (dir) {
+        await fs.mkdir(dir, { recursive: true });
+      }
+      await fs.writeFile(filePath, content, 'utf-8');
+      return { success: true };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to write file';
+      return { success: false, error: message };
+    }
+  });
+
+  ipc.handle('delete-file', async (_event, filePath: string) => {
+    try {
+      await fs.unlink(filePath);
+      return { success: true };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to delete file';
+      return { success: false, error: message };
+    }
+  });
+
+  // Autocomplete context
+  ipc.handle('get-autocomplete-context', () => {
+    return {
+      cwd: pty.process || process.cwd(),
+      recentCommands: [] as readonly string[],
+    };
   });
 
   return ptyBridge;
