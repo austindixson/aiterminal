@@ -1,5 +1,5 @@
-import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "@xterm/xterm/css/xterm.css";
 import { App } from "./App";
 import "./styles/global.css";
 import "./styles/components.css";
@@ -13,6 +13,7 @@ import "./styles/agent.css";
 import "./styles/file-picker.css";
 import "./styles/troubleshoot.css";
 import "./styles/agent-cursors.css";
+import "./styles/keybindings.css";
 
 const rootElement = document.getElementById("root");
 
@@ -20,8 +21,5 @@ if (!rootElement) {
   throw new Error("Root element not found. Ensure index.html contains <div id='root'></div>");
 }
 
-createRoot(rootElement).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// No StrictMode — it double-mounts in dev, creating duplicate xterm instances
+createRoot(rootElement).render(<App />);

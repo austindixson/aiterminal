@@ -20,12 +20,18 @@ import type { TaskType } from '@/ai/types';
  *
  * The heuristic checks for:
  * 1. Question words at the start (what, how, why, when, where, who, which)
- * 2. Imperative phrases common in questions/requests (explain, tell me, show me, help, please, can you, could you)
- * 3. Trailing question marks
+ * 2. Imperative phrases common in questions/requests
+ * 3. Action phrases (make, create, build, take me, open, etc.)
+ * 4. Trailing question marks
+ * 5. Multi-word input that doesn't look like a command
  */
 const QUESTION_STARTERS = /^(what|how|why|when|where|who|which)\b/i;
-const REQUEST_STARTERS = /^(explain|tell\s+me|show\s+me|help|please|can\s+you|could\s+you|describe|is\s+there)\b/i;
+const REQUEST_STARTERS = /^(explain|tell\s+me|show\s+me|help|please|can\s+you|could\s+you|describe|is\s+there|i\s+want|i\s+need)\b/i;
+const ACTION_STARTERS = /^(make\s+a|make\s+me|create|generate|set\s+up|setup|take\s+me|go\s+to|navigate|move\s+to|switch\s+to|deploy\s+to|deploy\s+the)\b/i;
 const TRAILING_QUESTION = /\?\s*$/;
+
+/** Common command prefixes that should NOT be treated as natural language. */
+const COMMAND_PREFIXES = /^(cd|ls|cat|echo|grep|find|awk|sed|curl|wget|git|npm|npx|yarn|pnpm|bun|node|python|python3|pip|brew|apt|sudo|chmod|chown|mv|cp|rm|mkdir|touch|tar|zip|unzip|ssh|scp|docker|kubectl|make|cargo|go|rustc|gcc|java|javac|ruby|php|perl|which|whereis|man|env|export|source|alias|kill|ps|top|htop|df|du|mount|ping|traceroute|nslookup|dig|ifconfig|ip|netstat|systemctl|journalctl|crontab|tmux|screen|vim|vi|nano|emacs|code|bat|exa|fd|rg|fzf|jq|yq|xargs|tee|wc|sort|uniq|head|tail|diff|patch|file|stat|readlink|basename|dirname|realpath|test|true|false|exit|clear|reset|history|set|unset|trap|wait|nohup|time|date|cal|uptime|whoami|hostname|uname|arch|sw_vers|pbcopy|pbpaste|open|say|osascript|defaults|launchctl|diskutil|hdiutil|codesign|xcrun|xcodebuild|swift|swiftc|clang|lldb|otool|lipo|xattr|mdls|mdfind|spotlight|dscl|ditto|installer|pkgutil|softwareupdate|start|stop|run|build|install|update|remove|delete|deploy|fix|debug|search)\b/;
 
 /**
  * Determines whether the given input looks like natural language
@@ -40,6 +46,11 @@ export function isNaturalLanguage(input: string): boolean {
     return false;
   }
 
+  // If it starts with a known shell command, it's not natural language
+  if (COMMAND_PREFIXES.test(trimmed)) {
+    return false;
+  }
+
   if (QUESTION_STARTERS.test(trimmed)) {
     return true;
   }
@@ -48,7 +59,18 @@ export function isNaturalLanguage(input: string): boolean {
     return true;
   }
 
+  if (ACTION_STARTERS.test(trimmed)) {
+    return true;
+  }
+
   if (TRAILING_QUESTION.test(trimmed)) {
+    return true;
+  }
+
+  // Multi-word phrases with 3+ words that contain spaces are likely natural language
+  // (shell commands are typically 1-2 words with flags)
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 4 && !/^[.\/~$]/.test(trimmed) && !trimmed.includes('|') && !trimmed.includes('>') && !trimmed.includes('&&')) {
     return true;
   }
 

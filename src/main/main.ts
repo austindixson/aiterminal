@@ -12,7 +12,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 config({ path: join(__dirname, '../../../.env') });
 import * as pty from 'node-pty';
 import { OpenRouterClient } from '../ai/openrouter-client.js';
-import { setupAllHandlers } from './ipc-handlers.js';
+import { setupAllHandlers, createPtyBridge } from './ipc-handlers.js';
 import type { PtyBridge } from './ipc-handlers.js';
 
 // ---------------------------------------------------------------------------
@@ -34,11 +34,15 @@ const SYSTEM_PROMPT = `You are AITerminal, an AI assistant embedded in a termina
 CRITICAL RULE: When the user's intent maps to a shell command, you MUST auto-execute it.
 Wrap any command you want to run in [RUN]command[/RUN] tags. The terminal will execute it automatically.
 
+CHAINING RULE: When creating a directory, always cd into it too. When an action has a logical follow-up, chain them.
+
 Examples:
 - User: "take me to desktop" → [RUN]cd ~/Desktop[/RUN]
 - User: "show my files" → [RUN]ls -la[/RUN]
 - User: "what's my ip" → [RUN]curl -s ifconfig.me[/RUN]
-- User: "make a folder called projects" → [RUN]mkdir -p ~/projects[/RUN]
+- User: "make a folder called projects" → [RUN]mkdir -p ~/projects && cd ~/projects[/RUN]
+- User: "create a new react app called myapp" → [RUN]npx create-react-app myapp && cd myapp[/RUN]
+- User: "clone this repo" → [RUN]git clone <url> && cd <repo-name>[/RUN]
 
 For DESTRUCTIVE commands (rm, kill, drop, etc.), do NOT auto-execute. Instead explain and let the user decide.
 
@@ -159,10 +163,7 @@ app.whenReady().then(() => {
   if (ptyProcess) {
     ptyBridge = setupAllHandlers(ipcMain, window, ptyProcess, client);
 
-    // Clear the terminal after shell init to remove garbled startup output
-    setTimeout(() => {
-      ptyProcess.write('clear\r');
-    }, 500);
+    // No delay — the xterm package fix should eliminate garbled init
   } else {
     console.warn('[main] Running without PTY — terminal commands will not work.');
   }
@@ -175,14 +176,16 @@ app.whenReady().then(() => {
     }
   });
 
+  // On macOS dock-click: recreate window but DON'T re-register IPC handlers
+  // (ipcMain.handle throws if registered twice)
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       const newWindow = createWindow();
       const newPty = spawnPty();
-      const newClient = createAIClient() ?? createStubAIClient();
 
       if (newPty) {
-        ptyBridge = setupAllHandlers(ipcMain, newWindow, newPty, newClient);
+        // Only recreate the PTY bridge — IPC handlers are already registered
+        ptyBridge = createPtyBridge(newWindow, newPty);
       }
 
       newWindow.on('closed', () => {

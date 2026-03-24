@@ -77,12 +77,26 @@ export class ThemeManager {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Convert a 6-digit hex color to rgba with the given alpha (0-1). */
+function addAlpha(hex: string, alpha: number): string {
+  const match = hex.match(/^#([0-9a-fA-F]{6})$/)
+  if (!match) return hex
+  const r = parseInt(match[1].slice(0, 2), 16)
+  const g = parseInt(match[1].slice(2, 4), 16)
+  const b = parseInt(match[1].slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+// ---------------------------------------------------------------------------
 // themeToXtermOptions — converts Theme to xterm.js ITheme shape
 // ---------------------------------------------------------------------------
 export function themeToXtermOptions(theme: Theme): IThemeOptions {
   const { colors } = theme
   return {
-    background: colors.background,
+    background: addAlpha(colors.background, 0),
     foreground: colors.foreground,
     cursor: colors.cursor,
     cursorAccent: colors.cursorAccent,

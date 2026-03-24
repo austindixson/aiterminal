@@ -29,16 +29,11 @@ import { AgentApprovalPanel } from '@/renderer/components/AgentApprovalPanel'
 import { FileTree } from '@/renderer/components/FileTree'
 
 // Shell helpers
-import { isNaturalLanguage, buildAIPrompt } from '@/shell/shell-service'
+import { isNaturalLanguage } from '@/shell/shell-service'
 
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
-
-function classifyNaturalLanguage(input: string): 'code_explain' | 'general' {
-  const codePhrases = /\b(code|function|class|module|import|export|variable|error|bug|syntax)\b/i
-  return codePhrases.test(input) ? 'code_explain' : 'general'
-}
 
 function mapIpcResponse(ipcResponse: any): AIResponse {
   return {
@@ -90,6 +85,9 @@ export const App: FC = () => {
   const filePreview = useFilePreview()
   const diffView = useDiffView()
   const agent = useAgent()
+
+  // NL routing toast
+  const [nlToast, setNlToast] = useState<string | null>(null)
 
   // CWD state — fetched from electron or defaults to home
   const [cwd, setCwd] = useState('')
@@ -146,30 +144,25 @@ export const App: FC = () => {
     }
   }, [])
 
-  const handleCommand = useCallback(async (input: string) => {
+  const handleCommand = useCallback((input: string): boolean => {
     const trimmed = input.trim()
-    if (trimmed.length === 0) return
+    if (trimmed.length === 0) return false
 
     if (isNaturalLanguage(trimmed)) {
-      setIsLoading(true)
-      try {
-        const taskType = classifyNaturalLanguage(trimmed)
-        const prompt = buildAIPrompt(trimmed, null, taskType)
-        const request: AIQueryRequest = { prompt, taskType }
-        const response = await window.electronAPI.aiQuery(request)
-        processAIResponse(response)
-      } catch {
-        setAIResponse(createErrorAIResponse('Failed to get AI response.'))
-      } finally {
-        setIsLoading(false)
-      }
-      return
+      // Show brief toast so the user knows their input was routed
+      setNlToast(trimmed)
+      setTimeout(() => setNlToast(null), 2500)
+
+      // Route to chat sidebar — auto-opens and sends as a chat message
+      chat.injectFromTerminal(trimmed) // fire-and-forget (async)
+      return true // signal TerminalView to NOT send Enter to PTY
     }
     // Shell commands go directly through PTY — save for error detection
     lastCommandRef.current = trimmed
-  }, [processAIResponse])
+    return false
+  }, [chat.injectFromTerminal])
 
-  // Monitor PTY output for error patterns and trigger AI
+  // Monitor PTY output for error patterns → route to chat sidebar
   const handlePtyOutput = useCallback((data: string) => {
     const errorPatterns = [
       /command not found/i,
@@ -182,27 +175,10 @@ export const App: FC = () => {
     if (cmd && errorPatterns.some(p => p.test(data))) {
       const capturedCmd = cmd
       lastCommandRef.current = ''
-
-      setIsLoading(true)
-      const prompt = buildAIPrompt(capturedCmd, {
-        exitCode: 127,
-        stdout: '',
-        stderr: data.trim(),
-        isAITriggered: true,
-      }, 'command_help')
-
-      window.electronAPI.aiQuery({ prompt, taskType: 'command_help' })
-        .then((response: any) => {
-          processAIResponse(response)
-        })
-        .catch(() => {
-          setAIResponse(createErrorAIResponse('Failed to get AI help.'))
-        })
-        .finally(() => {
-          setIsLoading(false)
-        })
+      // Send error context to chat sidebar
+      chat.injectFromTerminal(`Command \`${capturedCmd}\` failed: ${data.trim()}`)
     }
-  }, [processAIResponse])
+  }, [chat.injectFromTerminal])
 
   // -------------------------------------------------------------------------
   // Keyboard shortcuts
@@ -292,7 +268,7 @@ export const App: FC = () => {
     filePicker.open('')
   }, [filePicker.open])
 
-  const handleFilePickerSelect = useCallback((result: FilePickerResult) => {
+  const handleFilePickerSelect = useCallback(async (result: FilePickerResult) => {
     // Insert the file reference into chat input
     const currentInput = chat.state.inputValue
     // Replace trailing @ with @filename
@@ -302,12 +278,22 @@ export const App: FC = () => {
 
     chat.setInputValue(updatedInput)
 
-    // Also add as attachment if we can read the file content
-    chat.addAttachment({
-      name: result.name,
-      path: result.path,
-      content: undefined,
-    })
+    // Load file content for AI context
+    try {
+      const file = await window.electronAPI.readFile(result.path)
+      chat.addAttachment({
+        name: result.name,
+        path: result.path,
+        content: file.content,
+      })
+    } catch {
+      // Still attach without content if read fails
+      chat.addAttachment({
+        name: result.name,
+        path: result.path,
+        content: undefined,
+      })
+    }
 
     filePicker.dismiss()
   }, [chat.state.inputValue, chat.setInputValue, chat.addAttachment, filePicker.dismiss])
@@ -452,7 +438,7 @@ export const App: FC = () => {
 
         {/* ── Chat Sidebar (right panel) ── */}
         {chat.state.isOpen && (
-          <div className="chat-panel">
+          <div className="chat-panel" style={{ width: `${chat.state.width}px` }}>
             <ChatSidebar
               state={chat.state}
               onSendMessage={handleChatSend}
@@ -541,6 +527,16 @@ export const App: FC = () => {
           <span style={{ opacity: 0.6 }}>v0.1.0</span>
         </div>
       </div>
+
+      {/* NL routing toast */}
+      {nlToast && (
+        <div className="nl-toast">
+          <span className="nl-toast__icon">&rarr;</span>
+          <span className="nl-toast__text">
+            Sent to AI: {nlToast.length > 40 ? nlToast.slice(0, 40) + '\u2026' : nlToast}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

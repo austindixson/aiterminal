@@ -1,11 +1,13 @@
 /**
  * ChatMessageBubble — renders a single chat message.
  *
- * Supports markdown-lite rendering: code blocks, inline code, bold, links.
- * Shows model badge for assistant messages and relative timestamps.
+ * Uses react-markdown for full Markdown rendering in assistant messages.
+ * User messages render as plain text. Shows model badge for assistant
+ * messages and relative timestamps.
  */
 
-import type { FC, ReactNode } from 'react'
+import type { FC } from 'react'
+import ReactMarkdown from 'react-markdown'
 import type { ChatMessage } from '@/types/chat'
 
 // ---------------------------------------------------------------------------
@@ -14,103 +16,6 @@ import type { ChatMessage } from '@/types/chat'
 
 export interface ChatMessageBubbleProps {
   readonly message: ChatMessage
-}
-
-// ---------------------------------------------------------------------------
-// Markdown-lite parser
-// ---------------------------------------------------------------------------
-
-/**
- * Parses a subset of Markdown into React elements:
- * - Triple-backtick code blocks
- * - Inline backtick code
- * - Double-asterisk bold
- * - URL links
- */
-function parseContent(content: string): ReactNode[] {
-  const elements: ReactNode[] = []
-
-  // Split on code blocks first (```...```)
-  const codeBlockRegex = /```(?:\w+)?\n?([\s\S]*?)```/g
-  let lastIndex = 0
-  let match: RegExpExecArray | null = null
-
-  while ((match = codeBlockRegex.exec(content)) !== null) {
-    // Parse text before the code block
-    if (match.index > lastIndex) {
-      elements.push(
-        ...parseInline(content.slice(lastIndex, match.index), elements.length),
-      )
-    }
-
-    // Render code block
-    elements.push(
-      <div
-        key={`codeblock-${elements.length}`}
-        className="chat-message__code-block"
-      >
-        <pre>
-          <code>{match[1]}</code>
-        </pre>
-      </div>,
-    )
-
-    lastIndex = match.index + match[0].length
-  }
-
-  // Parse remaining text after last code block
-  if (lastIndex < content.length) {
-    elements.push(...parseInline(content.slice(lastIndex), elements.length))
-  }
-
-  return elements
-}
-
-/**
- * Parses inline markdown: `code`, **bold**, and plain text.
- */
-function parseInline(text: string, keyOffset: number): ReactNode[] {
-  const parts: ReactNode[] = []
-  // Pattern matches inline code OR bold
-  const inlineRegex = /`([^`]+)`|\*\*([^*]+)\*\*/g
-  let lastIndex = 0
-  let match: RegExpExecArray | null = null
-
-  while ((match = inlineRegex.exec(text)) !== null) {
-    // Plain text before the match
-    if (match.index > lastIndex) {
-      parts.push(
-        <span key={`text-${keyOffset}-${parts.length}`}>
-          {text.slice(lastIndex, match.index)}
-        </span>,
-      )
-    }
-
-    if (match[1] !== undefined) {
-      // Inline code
-      parts.push(
-        <code key={`code-${keyOffset}-${parts.length}`}>{match[1]}</code>,
-      )
-    } else if (match[2] !== undefined) {
-      // Bold
-      parts.push(
-        <strong key={`bold-${keyOffset}-${parts.length}`}>{match[2]}</strong>,
-      )
-    }
-
-    lastIndex = match.index + match[0].length
-  }
-
-  // Remaining plain text
-  if (lastIndex < text.length) {
-    parts.push(
-      <span key={`text-${keyOffset}-${parts.length}`}>
-        {text.slice(lastIndex)}
-      </span>,
-    )
-  }
-
-  return parts
 }
 
 // ---------------------------------------------------------------------------
@@ -150,9 +55,32 @@ export const ChatMessageBubble: FC<ChatMessageBubbleProps> = ({ message }) => {
         <span className="chat-message__model">{message.model}</span>
       )}
 
-      {/* Message content with markdown-lite parsing */}
+      {/* Message content */}
       <div className="chat-message__content">
-        {parseContent(message.content)}
+        {isAssistant ? (
+          <ReactMarkdown
+            components={{
+              code({ inline, className, children, ...props }: any) {
+                if (inline) {
+                  return <code {...props}>{children}</code>
+                }
+                return (
+                  <div className="chat-message__code-block">
+                    <pre>
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    </pre>
+                  </div>
+                )
+              },
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+        ) : (
+          message.content
+        )}
       </div>
 
       {/* Streaming indicator */}

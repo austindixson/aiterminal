@@ -50,7 +50,7 @@ const electronAPI: ElectronAPI = {
   // --- PTY bridge ---
   onPtyData: (callback: (data: string) => void) => {
     ptyCallback = callback;
-    // Flush any data that arrived before the renderer was ready
+    // Flush any buffered data (bridge delay means this should be empty)
     for (const data of ptyBuffer) {
       callback(data);
     }

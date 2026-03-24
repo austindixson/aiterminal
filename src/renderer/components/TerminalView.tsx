@@ -1,22 +1,15 @@
 import { useEffect, useRef } from 'react'
-import { Terminal } from 'xterm'
+import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { Theme } from '@/themes/types'
 import { themeToXtermOptions } from '@/themes/theme-manager'
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 export interface TerminalViewProps {
-  readonly onCommand: (input: string) => void
+  /** Called on Enter. Return true if handled (NL → chat) to prevent PTY execution. */
+  readonly onCommand: (input: string) => boolean
   readonly onPtyOutput?: (data: string) => void
   readonly theme: Theme
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutput, theme }) => {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -29,9 +22,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutp
 
   useEffect(() => {
     const container = containerRef.current
-    if (!container) {
-      return
-    }
+    if (!container) return
 
     const xtermTheme = themeToXtermOptions(theme)
 
@@ -43,22 +34,18 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutp
       cursorBlink: true,
       cursorStyle: 'bar',
       allowProposedApi: true,
+      allowTransparency: true,
     })
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     terminal.open(container)
 
-    try {
-      fitAddon.fit()
-    } catch {
-      // FitAddon.fit() can throw if container has zero dimensions (e.g., in tests)
-    }
+    try { fitAddon.fit() } catch { /* ignore zero-dimension errors */ }
 
-    // Check if electronAPI is available (not in tests)
     const hasElectronAPI = typeof window !== 'undefined' && 'electronAPI' in window
 
-    // Receive PTY output → write to xterm display + forward to parent
+    // PTY output → xterm
     if (hasElectronAPI) {
       window.electronAPI.onPtyData((data: string) => {
         terminal.write(data)
@@ -66,17 +53,24 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutp
       })
     }
 
-    // Send keystrokes to PTY AND track input buffer for AI routing
+    // Keystrokes → PTY + command tracking
     const dataDisposable = terminal.onData((data: string) => {
-      // Track the current line for AI detection on Enter
       if (data === '\r' || data === '\n') {
         const command = inputBufferRef.current
         inputBufferRef.current = ''
+
         if (command.length > 0) {
-          onCommandRef.current(command)
+          const handled = onCommandRef.current(command)
+          if (handled) {
+            // Natural language was routed to chat — clear the shell line
+            // (chars were already echoed to PTY while typing)
+            if (hasElectronAPI) {
+              window.electronAPI.writeToPty('\x15\r') // Ctrl+U: kill line + newline for clean prompt
+            }
+            return // don't send Enter to PTY
+          }
         }
       } else if (data === '\x7f') {
-        // Backspace — update buffer
         if (inputBufferRef.current.length > 0) {
           inputBufferRef.current = inputBufferRef.current.slice(0, -1)
         }
@@ -84,35 +78,27 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutp
         inputBufferRef.current += data
       }
 
-      // Forward ALL keystrokes to PTY (PTY handles echo, not us)
       if (hasElectronAPI) {
         window.electronAPI.writeToPty(data)
       }
     })
 
-    // Handle resize — sync xterm AND PTY dimensions
+    // Resize sync
     const handleResize = () => {
       try {
         fitAddon.fit()
         if (hasElectronAPI && terminal.cols && terminal.rows) {
           window.electronAPI.resizePty(terminal.cols, terminal.rows)
         }
-      } catch {
-        // Ignore fit errors during resize
-      }
+      } catch { /* ignore */ }
     }
     window.addEventListener('resize', handleResize)
 
-    // Observe container dimension changes (e.g., when AI panel splits the viewport)
-    const resizeObserver = new ResizeObserver(() => {
-      handleResize()
-    })
+    const resizeObserver = new ResizeObserver(() => handleResize())
     resizeObserver.observe(container)
 
     terminalRef.current = terminal
     terminal.focus()
-
-    // Initial resize sync
     handleResize()
 
     return () => {

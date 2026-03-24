@@ -84,7 +84,7 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--terminal-bg);
+  background: rgba(30, 32, 44, 0.72);
   position: relative;
 }
 
@@ -97,6 +97,7 @@
   overflow: hidden;
   margin-top: var(--titlebar-height);
   position: relative;
+  background: transparent;
 }
 
 /* ===== File Tree Container (left panel) ===== */
@@ -126,6 +127,7 @@
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  background: transparent;
 }
 
 /* ===== Terminal Section ===== */
@@ -136,6 +138,7 @@
   overflow: hidden;
   transition: flex 0.3s ease;
   -webkit-app-region: no-drag;
+  background: transparent;
 }
 
 .terminal-section--with-ai {
@@ -146,8 +149,11 @@
 
 .chat-panel {
   flex-shrink: 0;
-  border-left: 1px solid var(--glass-border);
   overflow: hidden;
+  border-left: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   animation: slideInRight 0.25s ease-out;
 }
 
@@ -169,7 +175,8 @@
 .terminal-view {
   width: 100%;
   height: 100%;
-  background-color: var(--terminal-bg);
+  background-color: transparent;
+  padding: 4px 0 0 8px;
 }
 
 /* ===== AI Section ===== */

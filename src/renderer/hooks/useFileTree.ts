@@ -31,7 +31,7 @@ export interface UseFileTreeReturn {
 
 export function useFileTree(cwd: string): UseFileTreeReturn {
   const [entries, setEntries] = useState<ReadonlyArray<FileEntry>>([])
-  const [isVisible, setIsVisible] = useState(true)
+  const [isVisible, setIsVisible] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
   const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(new Set())
   const [selectedPath, setSelectedPath] = useState<string | null>(null)

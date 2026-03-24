@@ -115,9 +115,8 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
 
   return (
     <div
-      className="chat-sidebar chat-sidebar--open"
+      className="chat-sidebar"
       data-testid="chat-sidebar"
-      style={{ width: `${state.width}px` }}
     >
       {/* Resize handle on left edge */}
       <div

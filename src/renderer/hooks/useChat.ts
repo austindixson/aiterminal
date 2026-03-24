@@ -91,6 +91,7 @@ export interface UseChatReturn {
   readonly removeAttachment: (path: string) => void
   readonly setInputValue: (value: string) => void
   readonly extractMentions: (text: string) => readonly string[]
+  readonly injectFromTerminal: (userInput: string) => Promise<void>
 }
 
 // ---------------------------------------------------------------------------
@@ -184,15 +185,37 @@ export function useChat(): UseChatReturn {
           window.electronAPI?.aiQuery
 
         if (hasElectronAPI) {
+          // Build conversation context from recent messages
+          const context = messages.slice(-10).map((msg) => ({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+          }))
+
           const response = await window.electronAPI.aiQuery({
             prompt: fullPrompt,
             taskType: 'general',
+            context,
           })
 
-          const assistantMsg = createAssistantMessage(
-            response.content ?? '',
-            response.model ?? '',
-          )
+          let content = response.content ?? ''
+          const model = response.model ?? ''
+
+          // Parse [RUN]command[/RUN] tags — auto-execute (with safety check)
+          const runMatch = content.match(/\[RUN\](.*?)\[\/RUN\]/s)
+          if (runMatch) {
+            const command = runMatch[1].trim()
+            const DESTRUCTIVE = /\b(rm\s|rmdir|kill\s|pkill|killall|drop\s|truncate|format|sudo\s|chmod\s777|>\s*\/|dd\s)/i
+            if (DESTRUCTIVE.test(command)) {
+              content = content.replace(/\[RUN\].*?\[\/RUN\]/s, '').trim()
+              content = `Blocked dangerous command: \`${command}\`\n\nRun it manually if intended.\n\n${content}`
+            } else {
+              window.electronAPI.writeToPty(command + '\r')
+              content = content.replace(/\[RUN\].*?\[\/RUN\]/s, '').trim()
+              content = content ? `Ran \`${command}\`\n\n${content}` : `Ran \`${command}\``
+            }
+          }
+
+          const assistantMsg = createAssistantMessage(content, model)
           setMessages((prev) => [...prev, assistantMsg].slice(-MAX_MESSAGES))
         }
       } catch {
@@ -204,7 +227,7 @@ export function useChat(): UseChatReturn {
         setIsStreaming(false)
       }
     },
-    [attachedFiles],
+    [attachedFiles, messages],
   )
 
   // -------------------------------------------------------------------------
@@ -231,6 +254,20 @@ export function useChat(): UseChatReturn {
     [isOpen, width, messages, inputValue, isStreaming, attachedFiles],
   )
 
+  // -------------------------------------------------------------------------
+  // Inject from terminal — auto-opens chat and sends a message
+  // Used when terminal detects natural language or errors
+  // -------------------------------------------------------------------------
+
+  const injectFromTerminal = useCallback(
+    async (userInput: string) => {
+      if (isStreaming) return // prevent concurrent AI calls
+      setIsOpen(true)  // auto-open sidebar
+      await sendMessage(userInput)
+    },
+    [sendMessage, isStreaming],
+  )
+
   return {
     state,
     open,
@@ -243,5 +280,6 @@ export function useChat(): UseChatReturn {
     removeAttachment,
     setInputValue,
     extractMentions,
+    injectFromTerminal,
   }
 }
