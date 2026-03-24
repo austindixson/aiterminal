@@ -15,26 +15,17 @@
   max-height: 60vh;
   display: flex;
   flex-direction: column;
-  background: rgba(30, 30, 46, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--glass-border);
   border-radius: 12px 12px 0 0;
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 -8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
   z-index: 50;
-  animation: agent-slideUp 0.25s ease-out;
+  animation: slideUp 0.2s ease-out;
   overflow: hidden;
-}
-
-@keyframes agent-slideUp {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
 }
 
 /* ---------------------------------------------------------------------------

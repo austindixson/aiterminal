@@ -124,6 +124,33 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.statusbar__shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusbar__kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: inherit;
+  color: var(--ansi-bright-black);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  line-height: 1.4;
+  cursor: default;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.statusbar__kbd:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--terminal-fg);
+}
+
 /* xterm overrides */
 .xterm {
   height: 100%;
@@ -161,4 +188,58 @@ body {
 
 ::selection {
   background: var(--terminal-selection);
+}
+
+/* ===== Global Scrollbars ===== */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ===== Global Focus States ===== */
+
+:focus-visible {
+  outline: 1px solid var(--glass-border-accent);
+  outline-offset: 2px;
+}
+
+/* ===== Shared Keyframes ===== */
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dropdownOpen {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
