@@ -62,6 +62,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
   const [modelError, setModelError] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState(false);
   const [showSelector, setShowSelector] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
 
   // Use default model if no intern specified
   const currentModel = getModelForIntern(intern);
@@ -285,16 +286,30 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 spine.rotation.x = breath * 0.3;
               }
 
-              // Subtle head movement - looking around slightly
-              const headMoveIntensity = 0.03;
-              const headMoveSpeed = 0.8;
-              const headYaw = Math.sin(elapsed * headMoveSpeed) * headMoveIntensity;
-              const headPitch = Math.cos(elapsed * headMoveSpeed * 0.7) * headMoveIntensity * 0.5;
-
-              const head = vrmModel.humanoid.getNormalizedBoneNode('head');
+              // ===== HEAD FOLLOWS CURSOR =====
+              const head = vrmModel.humanoid?.getNormalizedBoneNode('head');
               if (head) {
-                head.rotation.y = headYaw;
-                head.rotation.x = headPitch;
+                // Calculate cursor position relative to center of container
+                const rect = container.getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const deltaX = cursorPosition.x - centerX;
+                const deltaY = cursorPosition.y - centerY;
+
+                // Calculate head rotation to look at cursor
+                // NOTE: Avatar scene is rotated 180° on Y, so directions are flipped!
+                // Cursor on left = negative X, but avatar needs positive rotation to look left
+                const maxYaw = 0.6; // ~35 degrees left/right
+                const maxPitch = 0.25; // ~15 degrees up/down
+
+                // Flip X direction due to 180° scene rotation
+                const targetYaw = Math.max(-maxYaw, Math.min(maxYaw, (-deltaX / centerX) * maxYaw));
+                const targetPitch = Math.max(-maxPitch, Math.min(maxPitch, (-deltaY / centerY) * maxPitch));
+
+                // Smooth interpolation (LERP) for natural movement
+                const lerpFactor = 0.1; // Smooth but responsive
+                head.rotation.y += (targetYaw - head.rotation.y) * lerpFactor;
+                head.rotation.x += (targetPitch - head.rotation.x) * lerpFactor;
               }
 
               // Arm sway - adds life while maintaining resting pose
@@ -413,10 +428,25 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         };
         window.addEventListener('resize', handleResize);
 
+        // Track cursor position for head-following
+        const handleMouseMove = (e: MouseEvent) => {
+          const rect = container.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          // Only track if cursor is near the avatar canvas (within 300px)
+          const distanceX = Math.abs(x - rect.width / 2);
+          const distanceY = Math.abs(y - rect.height / 2);
+          if (distanceX < 300 && distanceY < 300) {
+            setCursorPosition({ x, y });
+          }
+        };
+        document.addEventListener('mousemove', handleMouseMove);
+
         cleanup = () => {
           window.removeEventListener('resize', handleResize);
           window.removeEventListener('keydown', handleKeyDown);
           window.removeEventListener('keyup', handleKeyUp);
+          document.removeEventListener('mousemove', handleMouseMove);
           // Dispose renderer but let React handle DOM cleanup
           if (renderer.domElement && renderer.domElement.parentNode) {
             renderer.domElement.parentNode.removeChild(renderer.domElement);
@@ -636,16 +666,30 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 spine.rotation.x = breath * 0.3;
               }
 
-              // Subtle head movement - looking around slightly
-              const headMoveIntensity = 0.03;
-              const headMoveSpeed = 0.8;
-              const headYaw = Math.sin(elapsed * headMoveSpeed) * headMoveIntensity;
-              const headPitch = Math.cos(elapsed * headMoveSpeed * 0.7) * headMoveIntensity * 0.5;
-
-              const head = vrmModel.humanoid.getNormalizedBoneNode('head');
+              // ===== HEAD FOLLOWS CURSOR =====
+              const head = vrmModel.humanoid?.getNormalizedBoneNode('head');
               if (head) {
-                head.rotation.y = headYaw;
-                head.rotation.x = headPitch;
+                // Calculate cursor position relative to center of container
+                const rect = container.getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const deltaX = cursorPosition.x - centerX;
+                const deltaY = cursorPosition.y - centerY;
+
+                // Calculate head rotation to look at cursor
+                // NOTE: Avatar scene is rotated 180° on Y, so directions are flipped!
+                // Cursor on left = negative X, but avatar needs positive rotation to look left
+                const maxYaw = 0.6; // ~35 degrees left/right
+                const maxPitch = 0.25; // ~15 degrees up/down
+
+                // Flip X direction due to 180° scene rotation
+                const targetYaw = Math.max(-maxYaw, Math.min(maxYaw, (-deltaX / centerX) * maxYaw));
+                const targetPitch = Math.max(-maxPitch, Math.min(maxPitch, (-deltaY / centerY) * maxPitch));
+
+                // Smooth interpolation (LERP) for natural movement
+                const lerpFactor = 0.1; // Smooth but responsive
+                head.rotation.y += (targetYaw - head.rotation.y) * lerpFactor;
+                head.rotation.x += (targetPitch - head.rotation.x) * lerpFactor;
               }
 
               // Arm sway - adds life while maintaining resting pose
@@ -763,6 +807,20 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
           renderer.setSize(container.clientWidth, container.clientHeight);
         };
         window.addEventListener('resize', handleResize);
+
+        // Track cursor position for head-following
+        const handleMouseMove = (e: MouseEvent) => {
+          const rect = container.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          // Only track if cursor is near the avatar canvas (within 300px)
+          const distanceX = Math.abs(x - rect.width / 2);
+          const distanceY = Math.abs(y - rect.height / 2);
+          if (distanceX < 300 && distanceY < 300) {
+            setCursorPosition({ x, y });
+          }
+        };
+        document.addEventListener('mousemove', handleMouseMove);
 
         cleanup = () => {
           window.removeEventListener('resize', handleResize);
