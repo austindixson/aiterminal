@@ -69,7 +69,8 @@
 
 /* Compact header when avatar is present */
 .chat-sidebar--with-avatar .chat-header {
-  padding: 8px 12px;
+  padding: 4px 8px;
+  min-height: 28px;
 }
 
 .chat-header__heading {
@@ -97,7 +98,7 @@
 
 /* Smaller title when avatar is present */
 .chat-sidebar--with-avatar .chat-header__title {
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .chat-header__subtitle {
@@ -145,10 +146,10 @@
 
 /* Smaller buttons when avatar is present */
 .chat-sidebar--with-avatar .chat-header__btn {
-  width: 24px;
-  height: 24px;
-  font-size: 11px;
-  border-radius: 5px;
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  border-radius: 4px;
 }
 
 .chat-header__btn:hover {

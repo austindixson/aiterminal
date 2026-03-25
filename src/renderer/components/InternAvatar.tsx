@@ -188,7 +188,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         // Tilt forward 10 degrees for conversational pose
         vrmModel.scene.rotation.y = Math.PI; // Face forward
         vrmModel.scene.rotation.x = -0.17; // Tilt forward ~10° (conversational pose)
-        vrmModel.scene.position.y = 0; // Ground level - model's feet at Y=0, head at ~Y=1.6
+        vrmModel.scene.position.y = 0.25; // Slightly raised for better face framing
         scene.add(vrmModel.scene);
 
         // ===== FIX T-POSE: Set natural resting pose =====
@@ -571,7 +571,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
         vrmModel.scene.rotation.y = Math.PI; // Face forward
         vrmModel.scene.rotation.x = -0.17; // Tilt forward ~10° (conversational pose)
-        vrmModel.scene.position.y = 0; // Ground level - model's feet at Y=0, head at ~Y=1.6
+        vrmModel.scene.position.y = 0.25; // Slightly raised for better face framing
         scene.add(vrmModel.scene);
 
         // ===== FIX T-POSE: Set natural resting pose =====
