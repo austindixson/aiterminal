@@ -130,7 +130,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
           0.1,
           20
         );
-        camera.position.set(0, 1.5, 1.0); // Closer and aligned with face level
+        camera.position.set(0, 1.7, 1.0); // Eye level for natural framing
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
@@ -474,7 +474,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         0.1,
         20
       );
-      camera.position.set(0, 1.5, 1.0); // Closer and aligned with face level
+      camera.position.set(0, 1.7, 1.0); // Eye level for natural framing
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
