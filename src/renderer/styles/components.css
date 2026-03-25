@@ -199,6 +199,38 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
+.chat-avatar-resize-handle {
+  flex: 0 0 auto;
+  height: 4px;
+  cursor: ns-resize;
+  background: transparent;
+  transition: background 0.2s ease;
+  position: relative;
+}
+
+.chat-avatar-resize-handle:hover,
+.chat-avatar-resize-handle:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-avatar-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.chat-avatar-resize-handle:hover::after {
+  opacity: 1;
+}
+
 /* ===== File Preview Panel (right overlay) ===== */
 
 .file-preview-panel {

@@ -19,6 +19,11 @@ const MIN_WIDTH = 280
 const MAX_WIDTH = 640
 const MAX_MESSAGES = 50
 
+// Avatar section resize constraints
+const DEFAULT_AVATAR_HEIGHT = 240
+const MIN_AVATAR_HEIGHT = 180
+const MAX_AVATAR_HEIGHT = 400
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -60,6 +65,10 @@ function clampWidth(width: number): number {
   return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width))
 }
 
+function clampAvatarHeight(height: number): number {
+  return Math.max(MIN_AVATAR_HEIGHT, Math.min(MAX_AVATAR_HEIGHT, height))
+}
+
 // ---------------------------------------------------------------------------
 // @mention regex
 // ---------------------------------------------------------------------------
@@ -80,6 +89,7 @@ export interface UseChatReturn {
   readonly close: () => void
   readonly toggle: () => void
   readonly setWidth: (width: number) => void
+  readonly setAvatarHeight: (height: number) => void
   readonly sendMessage: (content: string) => Promise<void>
   readonly clearMessages: () => void
   readonly addAttachment: (file: FileAttachment) => void
@@ -96,6 +106,7 @@ export interface UseChatReturn {
 export function useChat(): UseChatReturn {
   const [isOpen, setIsOpen] = useState(false)
   const [width, setWidthState] = useState(DEFAULT_WIDTH)
+  const [avatarHeight, setAvatarHeightState] = useState(DEFAULT_AVATAR_HEIGHT)
   const [messages, setMessages] = useState<ReadonlyArray<ChatMessage>>([])
   const [inputValue, setInputValueState] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
@@ -142,6 +153,10 @@ export function useChat(): UseChatReturn {
 
   const setWidth = useCallback((w: number) => {
     setWidthState(clampWidth(w))
+  }, [])
+
+  const setAvatarHeight = useCallback((h: number) => {
+    setAvatarHeightState(clampAvatarHeight(h))
   }, [])
 
   // -------------------------------------------------------------------------
@@ -316,6 +331,7 @@ export function useChat(): UseChatReturn {
     () => ({
       isOpen,
       width,
+      avatarHeight,
       messages,
       inputValue,
       isStreaming,
@@ -327,6 +343,7 @@ export function useChat(): UseChatReturn {
     [
       isOpen,
       width,
+      avatarHeight,
       messages,
       inputValue,
       isStreaming,
@@ -378,6 +395,7 @@ export function useChat(): UseChatReturn {
     close,
     toggle,
     setWidth,
+    setAvatarHeight,
     sendMessage,
     clearMessages,
     addAttachment,

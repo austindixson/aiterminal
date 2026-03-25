@@ -27,6 +27,7 @@ export interface FileAttachment {
 export interface ChatState {
   readonly isOpen: boolean
   readonly width: number           // sidebar width in px
+  readonly avatarHeight?: number   // avatar section height in px (optional, for resizable avatar panel)
   readonly messages: ReadonlyArray<ChatMessage>
   readonly inputValue: string
   readonly isStreaming: boolean

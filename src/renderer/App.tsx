@@ -443,6 +443,24 @@ export const App: FC = () => {
     document.addEventListener('mouseup', onMouseUp)
   }, [chat.state.width, chat.setWidth])
 
+  const handleAvatarResizeStart = useCallback((e: MouseEvent) => {
+    const startY = e.clientY
+    const startHeight = chat.state.avatarHeight || 240
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientY - startY
+      chat.setAvatarHeight(startHeight + delta)
+    }
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }, [chat.state.avatarHeight, chat.setAvatarHeight])
+
   // -------------------------------------------------------------------------
   // Autocomplete position (bottom-left of terminal area)
   // -------------------------------------------------------------------------
@@ -650,6 +668,7 @@ export const App: FC = () => {
               onClose={chat.close}
               onNewChat={chat.clearMessages}
               onResizeStart={handleChatResizeStart}
+              onAvatarResizeStart={handleAvatarResizeStart}
               onInputChange={chat.setInputValue}
               onRemoveAttachment={chat.removeAttachment}
               onMentionTrigger={handleMentionTrigger}

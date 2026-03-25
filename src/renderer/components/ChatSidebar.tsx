@@ -24,6 +24,7 @@ export interface ChatSidebarProps {
   readonly onClose: () => void
   readonly onNewChat: () => void
   readonly onResizeStart: (e: MouseEvent) => void
+  readonly onAvatarResizeStart?: (e: MouseEvent) => void
   readonly onInputChange: (value: string) => void
   readonly onRemoveAttachment: (path: string) => void
   readonly onMentionTrigger: () => void
@@ -41,6 +42,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
   onClose,
   onNewChat,
   onResizeStart,
+  onAvatarResizeStart,
   onInputChange,
   onRemoveAttachment,
   onMentionTrigger,
@@ -125,6 +127,15 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
     [onResizeStart],
   )
 
+  const handleAvatarResizeMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (onAvatarResizeStart) {
+        onAvatarResizeStart(e.nativeEvent)
+      }
+    },
+    [onAvatarResizeStart],
+  )
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -148,9 +159,23 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
 
       {/* Avatar section (split panel) */}
       {avatarSection && (
-        <div className="chat-avatar-section">
-          {avatarSection}
-        </div>
+        <>
+          <div
+            className="chat-avatar-section"
+            style={{ height: state.avatarHeight ? `${state.avatarHeight}px` : undefined }}
+          >
+            {avatarSection}
+          </div>
+
+          {/* Resizable separator */}
+          {onAvatarResizeStart && (
+            <div
+              className="chat-avatar-resize-handle"
+              onMouseDown={handleAvatarResizeMouseDown}
+              title="Drag to resize avatar section"
+            />
+          )}
+        </>
       )}
 
       {/* Header */}
