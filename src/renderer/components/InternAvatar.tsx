@@ -130,7 +130,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
           0.1,
           20
         );
-        camera.position.set(0, 1.7, 1.0); // Closer and higher to fill frame with face
+        camera.position.set(0, 1.5, 1.0); // Closer and aligned with face level
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
@@ -139,7 +139,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         container.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.target.set(0, 1.75, 0); // Higher target - focus on face
+        controls.target.set(0, 1.5, 0); // Focus on face level
         controls.enableZoom = true; // Enable zoom
         controls.enablePan = false; // Pan only with Ctrl+drag
         controls.minDistance = 0.5; // Allow much closer zoom
@@ -188,7 +188,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         // Tilt forward 10 degrees for conversational pose
         vrmModel.scene.rotation.y = Math.PI; // Face forward
         vrmModel.scene.rotation.x = -0.17; // Tilt forward ~10° (conversational pose)
-        vrmModel.scene.position.y = 1.65; // Raise model so face is visible in frame
+        vrmModel.scene.position.y = 0; // Ground level - model's feet at Y=0, head at ~Y=1.6
         scene.add(vrmModel.scene);
 
         // ===== FIX T-POSE: Set natural resting pose =====
@@ -474,7 +474,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         0.1,
         20
       );
-      camera.position.set(0, 1.7, 1.0); // Closer and higher to fill frame with face
+      camera.position.set(0, 1.5, 1.0); // Closer and aligned with face level
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
@@ -483,7 +483,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
       container.appendChild(renderer.domElement);
 
       const controls = new OrbitControls(camera, renderer.domElement);
-      controls.target.set(0, 1.75, 0); // Higher target - focus on face
+      controls.target.set(0, 1.5, 0); // Focus on face level
       controls.enableZoom = true; // Enable zoom
       controls.enablePan = false; // Pan only with Ctrl+drag
       controls.minDistance = 0.5; // Allow much closer zoom
@@ -571,7 +571,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
         vrmModel.scene.rotation.y = Math.PI; // Face forward
         vrmModel.scene.rotation.x = -0.17; // Tilt forward ~10° (conversational pose)
-        vrmModel.scene.position.y = 1.65; // Raise model so face is visible in frame
+        vrmModel.scene.position.y = 0; // Ground level - model's feet at Y=0, head at ~Y=1.6
         scene.add(vrmModel.scene);
 
         // ===== FIX T-POSE: Set natural resting pose =====
