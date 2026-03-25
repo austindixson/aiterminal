@@ -429,17 +429,12 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         };
         window.addEventListener('resize', handleResize);
 
-        // Track cursor position for head-following
+        // Track cursor position for head-following (works from anywhere in the app)
         const handleMouseMove = (e: MouseEvent) => {
           const rect = container.getBoundingClientRect();
           const x = e.clientX - rect.left;
           const y = e.clientY - rect.top;
-          // Only track if cursor is near the avatar canvas (within 300px)
-          const distanceX = Math.abs(x - rect.width / 2);
-          const distanceY = Math.abs(y - rect.height / 2);
-          if (distanceX < 300 && distanceY < 300) {
-            setCursorPosition({ x, y });
-          }
+          setCursorPosition({ x, y });
         };
         document.addEventListener('mousemove', handleMouseMove);
 
@@ -810,17 +805,12 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         };
         window.addEventListener('resize', handleResize);
 
-        // Track cursor position for head-following
+        // Track cursor position for head-following (works from anywhere in the app)
         const handleMouseMove = (e: MouseEvent) => {
           const rect = container.getBoundingClientRect();
           const x = e.clientX - rect.left;
           const y = e.clientY - rect.top;
-          // Only track if cursor is near the avatar canvas (within 300px)
-          const distanceX = Math.abs(x - rect.width / 2);
-          const distanceY = Math.abs(y - rect.height / 2);
-          if (distanceX < 300 && distanceY < 300) {
-            setCursorPosition({ x, y });
-          }
+          setCursorPosition({ x, y });
         };
         document.addEventListener('mousemove', handleMouseMove);
 
