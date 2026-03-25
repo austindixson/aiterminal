@@ -57,12 +57,12 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
   const containerRef = useRef<HTMLDivElement>(null);
   const vrmRef = useRef<any>(null);
   const vrmInitializedRef = useRef(false); // Track if VRM is initialized to prevent re-renders
+  const cursorPositionRef = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   const [currentExpression, setCurrentExpression] = useState<VRMExpression>('neutral');
   const [modelLoaded, setModelLoaded] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState(false);
   const [showSelector, setShowSelector] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
   // Use default model if no intern specified
   const currentModel = getModelForIntern(intern);
@@ -290,13 +290,16 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
               // ===== HEAD FOLLOWS CURSOR =====
               const head = vrmModel.humanoid?.getNormalizedBoneNode('head');
               if (head) {
+                // Get latest cursor position from ref (not state, to avoid closure issues)
+                const currentCursor = cursorPositionRef.current;
+
                 // Get window dimensions for full-screen cursor tracking
                 const windowCenterX = window.innerWidth / 2;
                 const windowCenterY = window.innerHeight / 2;
 
                 // Calculate cursor position relative to center of entire window
-                const deltaX = cursorPosition.x - windowCenterX;
-                const deltaY = cursorPosition.y - windowCenterY;
+                const deltaX = currentCursor.x - windowCenterX;
+                const deltaY = currentCursor.y - windowCenterY;
 
                 // Calculate head rotation to look at cursor
                 // NOTE: Avatar scene is rotated 180° on Y, so directions are flipped!
@@ -436,7 +439,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         // Track cursor position for head-following (works from anywhere in the app)
         const handleMouseMove = (e: MouseEvent) => {
           // Use client coordinates directly (relative to viewport)
-          setCursorPosition({ x: e.clientX, y: e.clientY });
+          cursorPositionRef.current = { x: e.clientX, y: e.clientY };
         };
         document.addEventListener('mousemove', handleMouseMove);
 
@@ -668,13 +671,16 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
               // ===== HEAD FOLLOWS CURSOR =====
               const head = vrmModel.humanoid?.getNormalizedBoneNode('head');
               if (head) {
+                // Get latest cursor position from ref (not state, to avoid closure issues)
+                const currentCursor = cursorPositionRef.current;
+
                 // Get window dimensions for full-screen cursor tracking
                 const windowCenterX = window.innerWidth / 2;
                 const windowCenterY = window.innerHeight / 2;
 
                 // Calculate cursor position relative to center of entire window
-                const deltaX = cursorPosition.x - windowCenterX;
-                const deltaY = cursorPosition.y - windowCenterY;
+                const deltaX = currentCursor.x - windowCenterX;
+                const deltaY = currentCursor.y - windowCenterY;
 
                 // Calculate head rotation to look at cursor
                 // NOTE: Avatar scene is rotated 180° on Y, so directions are flipped!
@@ -814,7 +820,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         // Track cursor position for head-following (works from anywhere in the app)
         const handleMouseMove = (e: MouseEvent) => {
           // Use client coordinates directly (relative to viewport)
-          setCursorPosition({ x: e.clientX, y: e.clientY });
+          cursorPositionRef.current = { x: e.clientX, y: e.clientY };
         };
         document.addEventListener('mousemove', handleMouseMove);
 
