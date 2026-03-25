@@ -304,11 +304,12 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 const maxPitch = 0.25; // ~15 degrees up/down
 
                 // Calculate normalized direction (-1 to 1) based on window position
-                const normalizedX = Math.max(-1, Math.min(1, deltaX / (window.innerWidth / 2)));
-                const normalizedY = Math.max(-1, Math.min(1, deltaY / (window.innerHeight / 2)));
+                const normalizedX = deltaX / (window.innerWidth / 2);
+                const normalizedY = deltaY / (window.innerHeight / 2);
 
-                // Flip X direction due to 180° scene rotation
-                const targetYaw = -normalizedX * maxYaw;
+                // With 180° scene rotation, need to flip X direction
+                // Cursor left (negative X) should make head look left
+                const targetYaw = normalizedX * maxYaw;
                 const targetPitch = -normalizedY * maxPitch;
 
                 // Smooth interpolation (LERP) for natural movement
@@ -682,11 +683,12 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 const maxPitch = 0.25; // ~15 degrees up/down
 
                 // Calculate normalized direction (-1 to 1) based on window position
-                const normalizedX = Math.max(-1, Math.min(1, deltaX / (window.innerWidth / 2)));
-                const normalizedY = Math.max(-1, Math.min(1, deltaY / (window.innerHeight / 2)));
+                const normalizedX = deltaX / (window.innerWidth / 2);
+                const normalizedY = deltaY / (window.innerHeight / 2);
 
-                // Flip X direction due to 180° scene rotation
-                const targetYaw = -normalizedX * maxYaw;
+                // With 180° scene rotation, need to flip X direction
+                // Cursor left (negative X) should make head look left
+                const targetYaw = normalizedX * maxYaw;
                 const targetPitch = -normalizedY * maxPitch;
 
                 // Smooth interpolation (LERP) for natural movement
