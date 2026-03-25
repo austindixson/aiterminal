@@ -310,8 +310,8 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 const normalizedX = deltaX / (window.innerWidth / 2);
                 const normalizedY = deltaY / (window.innerHeight / 2);
 
-                // With 180° scene rotation, negate X to flip direction
-                const targetYaw = -normalizedX * maxYaw;
+                // Calculate target rotations (no negation needed - 180° scene rotation handled internally)
+                const targetYaw = normalizedX * maxYaw;
                 const targetPitch = -normalizedY * maxPitch;
 
                 // Smooth interpolation (LERP) for natural movement
@@ -691,8 +691,8 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 const normalizedX = deltaX / (window.innerWidth / 2);
                 const normalizedY = deltaY / (window.innerHeight / 2);
 
-                // With 180° scene rotation, negate X to flip direction
-                const targetYaw = -normalizedX * maxYaw;
+                // Calculate target rotations (no negation needed - 180° scene rotation handled internally)
+                const targetYaw = normalizedX * maxYaw;
                 const targetPitch = -normalizedY * maxPitch;
 
                 // Smooth interpolation (LERP) for natural movement
