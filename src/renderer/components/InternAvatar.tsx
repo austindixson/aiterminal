@@ -290,22 +290,26 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
               // ===== HEAD FOLLOWS CURSOR =====
               const head = vrmModel.humanoid?.getNormalizedBoneNode('head');
               if (head) {
-                // Calculate cursor position relative to center of container
-                const rect = container.getBoundingClientRect();
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
-                const deltaX = cursorPosition.x - centerX;
-                const deltaY = cursorPosition.y - centerY;
+                // Get window dimensions for full-screen cursor tracking
+                const windowCenterX = window.innerWidth / 2;
+                const windowCenterY = window.innerHeight / 2;
+
+                // Calculate cursor position relative to center of entire window
+                const deltaX = cursorPosition.x - windowCenterX;
+                const deltaY = cursorPosition.y - windowCenterY;
 
                 // Calculate head rotation to look at cursor
                 // NOTE: Avatar scene is rotated 180° on Y, so directions are flipped!
-                // Cursor on left = negative X, but avatar needs positive rotation to look left
                 const maxYaw = 0.6; // ~35 degrees left/right
                 const maxPitch = 0.25; // ~15 degrees up/down
 
+                // Calculate normalized direction (-1 to 1) based on window position
+                const normalizedX = Math.max(-1, Math.min(1, deltaX / (window.innerWidth / 2)));
+                const normalizedY = Math.max(-1, Math.min(1, deltaY / (window.innerHeight / 2)));
+
                 // Flip X direction due to 180° scene rotation
-                const targetYaw = Math.max(-maxYaw, Math.min(maxYaw, (-deltaX / centerX) * maxYaw));
-                const targetPitch = Math.max(-maxPitch, Math.min(maxPitch, (-deltaY / centerY) * maxPitch));
+                const targetYaw = -normalizedX * maxYaw;
+                const targetPitch = -normalizedY * maxPitch;
 
                 // Smooth interpolation (LERP) for natural movement
                 const lerpFactor = 0.1; // Smooth but responsive
@@ -431,10 +435,8 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
         // Track cursor position for head-following (works from anywhere in the app)
         const handleMouseMove = (e: MouseEvent) => {
-          const rect = container.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          setCursorPosition({ x, y });
+          // Use client coordinates directly (relative to viewport)
+          setCursorPosition({ x: e.clientX, y: e.clientY });
         };
         document.addEventListener('mousemove', handleMouseMove);
 
@@ -666,22 +668,26 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
               // ===== HEAD FOLLOWS CURSOR =====
               const head = vrmModel.humanoid?.getNormalizedBoneNode('head');
               if (head) {
-                // Calculate cursor position relative to center of container
-                const rect = container.getBoundingClientRect();
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
-                const deltaX = cursorPosition.x - centerX;
-                const deltaY = cursorPosition.y - centerY;
+                // Get window dimensions for full-screen cursor tracking
+                const windowCenterX = window.innerWidth / 2;
+                const windowCenterY = window.innerHeight / 2;
+
+                // Calculate cursor position relative to center of entire window
+                const deltaX = cursorPosition.x - windowCenterX;
+                const deltaY = cursorPosition.y - windowCenterY;
 
                 // Calculate head rotation to look at cursor
                 // NOTE: Avatar scene is rotated 180° on Y, so directions are flipped!
-                // Cursor on left = negative X, but avatar needs positive rotation to look left
                 const maxYaw = 0.6; // ~35 degrees left/right
                 const maxPitch = 0.25; // ~15 degrees up/down
 
+                // Calculate normalized direction (-1 to 1) based on window position
+                const normalizedX = Math.max(-1, Math.min(1, deltaX / (window.innerWidth / 2)));
+                const normalizedY = Math.max(-1, Math.min(1, deltaY / (window.innerHeight / 2)));
+
                 // Flip X direction due to 180° scene rotation
-                const targetYaw = Math.max(-maxYaw, Math.min(maxYaw, (-deltaX / centerX) * maxYaw));
-                const targetPitch = Math.max(-maxPitch, Math.min(maxPitch, (-deltaY / centerY) * maxPitch));
+                const targetYaw = -normalizedX * maxYaw;
+                const targetPitch = -normalizedY * maxPitch;
 
                 // Smooth interpolation (LERP) for natural movement
                 const lerpFactor = 0.1; // Smooth but responsive
@@ -807,10 +813,8 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
         // Track cursor position for head-following (works from anywhere in the app)
         const handleMouseMove = (e: MouseEvent) => {
-          const rect = container.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          setCursorPosition({ x, y });
+          // Use client coordinates directly (relative to viewport)
+          setCursorPosition({ x: e.clientX, y: e.clientY });
         };
         document.addEventListener('mousemove', handleMouseMove);
 
