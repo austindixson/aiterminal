@@ -1,7 +1,27 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/components/FileTree.tsx
+ * Module: renderer/components
+ * Purpose: Recursive file tree component with expand/collapse, hidden files toggle, and parent navigation
+ * Dependencies: react, @/types/file-tree, @/file-tree/file-tree-service
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/hooks/useFileTree.ts, /Users/ghost/Desktop/aiterminal/src/file-tree/file-tree-service.ts
+ * Keywords: file-tree, recursive, expand-collapse, hidden-files, parent-directory, posix
+ * Last Updated: 2026-03-24
+ */
+
 import { useState, useCallback, useMemo } from 'react'
 import type { FC } from 'react'
 import type { FileEntry } from '@/types/file-tree'
 import { getFileIcon } from '@/file-tree/file-tree-service'
+
+/** POSIX parent directory — browser-safe (no Node `path`; Vite cannot bundle it for the renderer). */
+function posixDirname(p: string): string {
+  if (!p || p === '/') return '/'
+  const trimmed = p.replace(/\/+$/, '')
+  if (trimmed === '/') return '/'
+  const i = trimmed.lastIndexOf('/')
+  if (i <= 0) return '/'
+  return trimmed.slice(0, i) || '/'
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -13,6 +33,10 @@ export interface FileTreeProps {
   readonly isVisible: boolean
   readonly onToggle: () => void
   readonly onFileSelect?: (path: string) => void
+  readonly onDirectorySelect?: (path: string) => void
+  /** Navigate to parent directory (shell + tree sync). */
+  readonly onGoToParent?: () => void
+  readonly canGoToParent?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -27,6 +51,7 @@ interface FileTreeNodeProps {
   readonly showHidden: boolean
   readonly onToggleExpand: (path: string) => void
   readonly onSelect: (path: string) => void
+  readonly onDirectorySelect?: (path: string) => void
 }
 
 const FileTreeNode: FC<FileTreeNodeProps> = ({
@@ -37,6 +62,7 @@ const FileTreeNode: FC<FileTreeNodeProps> = ({
   showHidden,
   onToggleExpand,
   onSelect,
+  onDirectorySelect,
 }) => {
   const isExpanded = expandedPaths.has(entry.path)
   const isSelected = selectedPath === entry.path
@@ -49,6 +75,12 @@ const FileTreeNode: FC<FileTreeNodeProps> = ({
       onSelect(entry.path)
     }
   }, [entry.isDirectory, entry.path, onToggleExpand, onSelect])
+
+  const handleDoubleClick = useCallback(() => {
+    if (entry.isDirectory && onDirectorySelect) {
+      onDirectorySelect(entry.path)
+    }
+  }, [entry.isDirectory, entry.path, onDirectorySelect])
 
   const entryClasses = [
     'file-tree-entry',
@@ -66,6 +98,7 @@ const FileTreeNode: FC<FileTreeNodeProps> = ({
         data-depth={String(depth)}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         role="treeitem"
         aria-expanded={entry.isDirectory ? isExpanded : undefined}
       >
@@ -94,6 +127,7 @@ const FileTreeNode: FC<FileTreeNodeProps> = ({
                 showHidden={showHidden}
                 onToggleExpand={onToggleExpand}
                 onSelect={onSelect}
+                onDirectorySelect={onDirectorySelect}
               />
             ))}
         </div>
@@ -112,6 +146,9 @@ export const FileTree: FC<FileTreeProps> = ({
   isVisible,
   onToggle,
   onFileSelect,
+  onDirectorySelect,
+  onGoToParent,
+  canGoToParent,
 }) => {
   const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(new Set())
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -147,6 +184,11 @@ export const FileTree: FC<FileTreeProps> = ({
     [entries, showHidden],
   )
 
+  const derivedCanGoParent = cwd.length > 0 && posixDirname(cwd) !== cwd
+  const showParent =
+    typeof onGoToParent === 'function' &&
+    (canGoToParent !== undefined ? canGoToParent : derivedCanGoParent)
+
   if (!isVisible) {
     return null
   }
@@ -158,6 +200,17 @@ export const FileTree: FC<FileTreeProps> = ({
           {cwd}
         </span>
         <div className="file-tree-header-controls">
+          {showParent && (
+            <button
+              type="button"
+              className="file-tree-btn"
+              onClick={onGoToParent}
+              aria-label="Parent directory"
+              title="Parent directory (cd ..)"
+            >
+              ↑
+            </button>
+          )}
           <button
             type="button"
             className="file-tree-btn"
@@ -174,7 +227,7 @@ export const FileTree: FC<FileTreeProps> = ({
             aria-label="Toggle file tree"
             title="Toggle file tree"
           >
-            \u2715
+            ×
           </button>
         </div>
       </div>
@@ -190,6 +243,7 @@ export const FileTree: FC<FileTreeProps> = ({
             showHidden={showHidden}
             onToggleExpand={handleToggleExpand}
             onSelect={handleSelect}
+            onDirectorySelect={onDirectorySelect}
           />
         ))}
       </div>

@@ -1,19 +1,38 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/main/main.ts
+ * Module: main
+ * Purpose: Electron main process entry point — creates BrowserWindow, spawns PTY, initializes AI client, wires IPC
+ * Dependencies: electron, node-pty, dotenv, OpenRouterClient, setupAllHandlers, TerminalSessionManager, DaemonBridge, kokoroTtsService
+ * Related: /Users/ghost/Desktop/aiterminal/src/main/ipc-handlers.ts, /Users/ghost/Desktop/aiterminal/src/ai/openrouter-client.ts, /Users/ghost/Desktop/aiterminal/src/main/terminal-session-manager.ts
+ * Keywords: electron, main-process, PTY, IPC, browser-window, AI-client, initialization, app-lifecycle, daemon-bridge, kokoro-tts
+ * Last Updated: 2026-03-24
+ */
+
 /**
  * Electron main process — creates the BrowserWindow, spawns the PTY,
  * initializes the AI client, and wires all IPC handlers.
  */
 
 import { config } from 'dotenv';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { getSuperenvPath } from '../integrations/ecosystem.js';
 
 // Load .env from project root before anything else
 // __dirname is dist/main/main/ so we go up 3 levels to project root
 config({ path: join(__dirname, '../../../.env') });
-import * as pty from 'node-pty';
+const superEnv = getSuperenvPath();
+console.log('[main] OPENROUTER_API_KEY after .env load:', process.env.OPENROUTER_API_KEY ? 'Set' : 'Not Set');
+if (superEnv) {
+  config({ path: resolve(superEnv), override: false });
+}
 import { OpenRouterClient } from '../ai/openrouter-client.js';
-import { setupAllHandlers, createPtyBridge } from './ipc-handlers.js';
-import type { PtyBridge } from './ipc-handlers.js';
+import { setupAllHandlers, type SessionManagerRef } from './ipc-handlers.js';
+import { kokoroTtsService } from './kokoro-service.js';
+import { TerminalSessionManager } from './terminal-session-manager.js';
+import { DaemonBridge, registerDaemonIpc } from './daemon-bridge.js';
+import './agent-loop-handlers.js';
+import './transcript-handlers.js';
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -68,38 +87,11 @@ function createAIClient(): OpenRouterClient | null {
   });
 }
 
-// ---------------------------------------------------------------------------
-// PTY spawn
-// ---------------------------------------------------------------------------
+const aiClient = createAIClient();
 
-function spawnPty(): pty.IPty | null {
-  const shell = process.env.SHELL || '/bin/zsh';
+console.log('[main] AI Client:', aiClient ? 'Initialized' : 'Stubbed');
 
-  try {
-    return pty.spawn(shell, [], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      cwd: process.env.HOME || '/',
-      env: process.env as Record<string, string>,
-    });
-  } catch (err) {
-    console.error('[main] Failed to spawn PTY:', err);
-    console.error('[main] Trying with /bin/zsh directly...');
-    try {
-      return pty.spawn('/bin/zsh', [], {
-        name: 'xterm-256color',
-        cols: 80,
-        rows: 24,
-        cwd: process.env.HOME || '/',
-        env: process.env as Record<string, string>,
-      });
-    } catch (err2) {
-      console.error('[main] PTY spawn failed entirely:', err2);
-      return null;
-    }
-  }
-}
+// No longer need spawnPty function — TerminalSessionManager handles PTY creation
 
 // ---------------------------------------------------------------------------
 // BrowserWindow
@@ -149,53 +141,62 @@ function createWindow(): BrowserWindow {
 // App lifecycle
 // ---------------------------------------------------------------------------
 
-let ptyBridge: PtyBridge | null = null;
+const sessionManagerRef: SessionManagerRef = { current: null };
+const mainWindowRef: { current: BrowserWindow | null } = { current: null };
 
 app.whenReady().then(() => {
   const window = createWindow();
-  const ptyProcess = spawnPty();
+  mainWindowRef.current = window;
+
+  const daemonBridge = new DaemonBridge();
+  daemonBridge.setWindowGetter(() => mainWindowRef.current);
+  registerDaemonIpc(ipcMain, daemonBridge);
+  daemonBridge.connect();
+
   const aiClient = createAIClient();
 
   // Wire all IPC handlers. If no AI client is available (missing API key),
   // create a stub that returns helpful error messages.
   const client = aiClient ?? createStubAIClient();
 
-  if (ptyProcess) {
-    ptyBridge = setupAllHandlers(ipcMain, window, ptyProcess, client);
+  const sessionManager = new TerminalSessionManager(window);
+  sessionManagerRef.current = sessionManager;
 
-    // No delay — the xterm package fix should eliminate garbled init
-  } else {
-    console.warn('[main] Running without PTY — terminal commands will not work.');
+  setupAllHandlers(ipcMain, window, sessionManagerRef, client);
+
+  const initialSession = sessionManager.createSession();
+  if (!initialSession) {
+    console.warn('[main] Failed to create initial terminal session.');
   }
 
-  // Clean up PTY when the window closes
   window.on('closed', () => {
-    if (ptyBridge) {
-      ptyBridge.dispose();
-      ptyBridge = null;
-    }
+    sessionManager.destroyAll();
+    sessionManagerRef.current = null;
+    mainWindowRef.current = null;
   });
 
-  // On macOS dock-click: recreate window but DON'T re-register IPC handlers
-  // (ipcMain.handle throws if registered twice)
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       const newWindow = createWindow();
-      const newPty = spawnPty();
+      mainWindowRef.current = newWindow;
+      const newSessionManager = new TerminalSessionManager(newWindow);
+      sessionManagerRef.current = newSessionManager;
 
-      if (newPty) {
-        // Only recreate the PTY bridge — IPC handlers are already registered
-        ptyBridge = createPtyBridge(newWindow, newPty);
+      const initialSession = newSessionManager.createSession();
+      if (!initialSession) {
+        console.warn('[main] Failed to create initial terminal session for new window.');
       }
 
       newWindow.on('closed', () => {
-        if (ptyBridge) {
-          ptyBridge.dispose();
-          ptyBridge = null;
-        }
+        newSessionManager.destroyAll();
+        sessionManagerRef.current = null;
       });
     }
   });
+});
+
+app.on('before-quit', () => {
+  kokoroTtsService.dispose();
 });
 
 app.on('window-all-closed', () => {
@@ -233,5 +234,6 @@ function createStubAIClient() {
       contextWindow: 0,
     }),
     setPreset: () => {},
+    getActivePresetName: () => 'none',
   };
 }

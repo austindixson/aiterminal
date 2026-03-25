@@ -23,15 +23,23 @@ import type { TaskType } from '@/ai/types';
  * 2. Imperative phrases common in questions/requests
  * 3. Action phrases (make, create, build, take me, open, etc.)
  * 4. Trailing question marks
- * 5. Multi-word input that doesn't look like a command
+ * 5. Short greetings / thanks / bye (e.g. "hello", "good morning")
+ * 6. Multi-word input that doesn't look like a command
  */
 const QUESTION_STARTERS = /^(what|how|why|when|where|who|which)\b/i;
-const REQUEST_STARTERS = /^(explain|tell\s+me|show\s+me|help|please|can\s+you|could\s+you|describe|is\s+there|i\s+want|i\s+need)\b/i;
+const REQUEST_STARTERS = /^(explain|tell\s+me|show\s+me|help|please|can\s+you|could\s+you|describe|is\s+there|i\s+want|i\s+need|analyze|review|understand|check|audit|summarize|walk\s+me\s+through)\b/i;
 const ACTION_STARTERS = /^(make\s+a|make\s+me|create|generate|set\s+up|setup|take\s+me|go\s+to|navigate|move\s+to|switch\s+to|deploy\s+to|deploy\s+the)\b/i;
 const TRAILING_QUESTION = /\?\s*$/;
 
+/**
+ * Short social / greeting input — not shell. Keeps "hello" from hitting the PTY
+ * and then error-analysis flow.
+ */
+const GREETING_OR_SOCIAL =
+  /^(?:hello|hi|hey|howdy|sup|yo|greetings|morning|afternoon|evening)(?:\s+there)?$|^(?:good\s+(?:morning|afternoon|evening))$|^(?:thanks|thank\s+you|thx|bye|goodbye|cheers|ciao)\s*!*$/i;
+
 /** Common command prefixes that should NOT be treated as natural language. */
-const COMMAND_PREFIXES = /^(cd|ls|cat|echo|grep|find|awk|sed|curl|wget|git|npm|npx|yarn|pnpm|bun|node|python|python3|pip|brew|apt|sudo|chmod|chown|mv|cp|rm|mkdir|touch|tar|zip|unzip|ssh|scp|docker|kubectl|make|cargo|go|rustc|gcc|java|javac|ruby|php|perl|which|whereis|man|env|export|source|alias|kill|ps|top|htop|df|du|mount|ping|traceroute|nslookup|dig|ifconfig|ip|netstat|systemctl|journalctl|crontab|tmux|screen|vim|vi|nano|emacs|code|bat|exa|fd|rg|fzf|jq|yq|xargs|tee|wc|sort|uniq|head|tail|diff|patch|file|stat|readlink|basename|dirname|realpath|test|true|false|exit|clear|reset|history|set|unset|trap|wait|nohup|time|date|cal|uptime|whoami|hostname|uname|arch|sw_vers|pbcopy|pbpaste|open|say|osascript|defaults|launchctl|diskutil|hdiutil|codesign|xcrun|xcodebuild|swift|swiftc|clang|lldb|otool|lipo|xattr|mdls|mdfind|spotlight|dscl|ditto|installer|pkgutil|softwareupdate|start|stop|run|build|install|update|remove|delete|deploy|fix|debug|search)\b/;
+const COMMAND_PREFIXES = /^(cd|ls|cat|echo|grep|find|awk|sed|curl|wget|git|npm|npx|yarn|pnpm|bun|node|python|python3|pip|brew|apt|sudo|chmod|chown|mv|cp|rm|mkdir|touch|tar|zip|unzip|ssh|scp|docker|kubectl|make|cargo|go|rustc|gcc|java|javac|ruby|php|perl|which|whereis|man|env|export|source|alias|kill|ps|top|htop|df|du|mount|ping|traceroute|nslookup|dig|ifconfig|ip|netstat|systemctl|journalctl|crontab|tmux|screen|vim|vi|nano|emacs|code|claude|bat|exa|fd|rg|fzf|jq|yq|xargs|tee|wc|sort|uniq|head|tail|diff|patch|file|stat|readlink|basename|dirname|realpath|test|true|false|exit|clear|reset|history|set|unset|trap|wait|nohup|time|date|cal|uptime|whoami|hostname|uname|arch|sw_vers|pbcopy|pbpaste|open|say|osascript|defaults|launchctl|diskutil|hdiutil|codesign|xcrun|xcodebuild|swift|swiftc|clang|lldb|otool|lipo|xattr|mdls|mdfind|spotlight|dscl|ditto|installer|pkgutil|softwareupdate|start|stop|run|build|install|update|remove|delete|deploy|fix|debug|search)\b/;
 
 /**
  * Determines whether the given input looks like natural language
@@ -44,6 +52,25 @@ export function isNaturalLanguage(input: string): boolean {
 
   if (trimmed.length === 0) {
     return false;
+  }
+
+  // Check for NL patterns that use command words FIRST (before command prefix check)
+  // These are natural language requests that happen to start with command-like words
+  const NL_COMMAND_PATTERNS = [
+    /^(cd\s+(into|to)\s+)/i,           // "cd into Desktop", "cd to project"
+    /^(change\s+directory\s+(to|into)\s+)/i,  // "change directory to Desktop"
+    /^(list\s+(files|directory|dirs)\s+(in|from|for)\s+)/i,  // "list files in src"
+    /^(show\s+(me\s+)?(files|directory|dir|folders)\s+(in|from|for)\s+)/i,  // "show files in src"
+  ];
+
+  for (const pattern of NL_COMMAND_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return true;
+    }
+  }
+
+  if (GREETING_OR_SOCIAL.test(trimmed)) {
+    return true;
   }
 
   // If it starts with a known shell command, it's not natural language
@@ -74,6 +101,33 @@ export function isNaturalLanguage(input: string): boolean {
     return true;
   }
 
+  return false;
+}
+
+/**
+ * True when the user submitted a line that launches an interactive TUI CLI
+ * (Claude Code, etc.) — AITerminal should enable TUI mode so prompts like `> hello`
+ * are not routed to the AI chat as natural language.
+ */
+export function isTuiCliInvocation(input: string): boolean {
+  const t = input.trim();
+  if (!t) return false;
+  // Anthropic Claude Code CLI (also matches `claude --help`, `claude /path`)
+  if (/^claude(\s|$)/i.test(t)) return true;
+  return false;
+}
+
+/**
+ * Heuristic: PTY output indicates a full-screen TUI or Claude Code's REPL is active.
+ * Used to auto-enable TUI mode if the user didn't launch via a detected command line.
+ */
+export function shouldAutoEnableTuiFromPtyOutput(data: string): boolean {
+  // Alternate screen buffer — used by many TUIs (vim, claude, etc.)
+  if (data.includes('\x1b[?1049h')) return true;
+  // Claude Code branding / welcome (see Anthropic CLI banners)
+  if (/Claude Code/i.test(data)) return true;
+  if (/Welcome back\b/i.test(data) && /\bClaude\b/i.test(data)) return true;
+  if (/\bSonnet\b.*\b(?:high|low|medium)\s+effort/i.test(data)) return true;
   return false;
 }
 

@@ -30,6 +30,9 @@
   --window-blur: 20px;
 
   --glass-bg: rgba(40, 42, 54, 0.85);
+  /* Left/right rails: frosted glass — a bit more blur + tint than generic --glass-bg */
+  --glass-sidebar-bg: rgba(40, 42, 54, 0.88);
+  --glass-sidebar-blur: 28px;
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-border-accent: rgba(189, 147, 249, 0.2);
   --accent-gradient: linear-gradient(135deg, var(--ansi-blue), var(--ansi-magenta));
@@ -86,6 +89,49 @@ html {
   color: var(--ansi-bright-black);
   letter-spacing: 0.02em;
   user-select: none;
+}
+
+/* Titlebar toggles (VS Code-style) */
+.titlebar__toggles {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar__toggle {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--ansi-bright-black);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 100ms ease, background 100ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar__toggle:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.titlebar__toggle:active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.titlebar__toggle svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 /* Status bar */
@@ -269,6 +315,7 @@ html {
 @keyframes dropdownOpen {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
+}
 
 /* ===== NL Routing Toast ===== */
 
@@ -301,3 +348,301 @@ html {
 .nl-toast__text {
   opacity: 0.85;
 }
+
+/* ===== Agent Mode (Titlebar Control) ===== */
+
+.titlebar-agent-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  -webkit-app-region: no-drag;
+  position: relative;
+}
+
+.titlebar-agent-mode__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+}
+
+.titlebar-agent-mode__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.titlebar-agent-mode__dot--active {
+  background: var(--ansi-blue);
+  box-shadow: 0 0 8px var(--ansi-blue);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.titlebar-agent-mode__toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-agent-mode__toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.titlebar-agent-mode__toggle:active {
+  transform: scale(0.98);
+}
+
+.titlebar-agent-mode__toggle--enabled {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.titlebar-agent-mode__toggle--enabled:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.titlebar-agent-mode__toggle-slider {
+  width: 24px;
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.15);
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.titlebar-agent-mode__toggle--enabled .titlebar-agent-mode__toggle-slider {
+  background: rgba(59, 130, 246, 0.6);
+}
+
+.titlebar-agent-mode__toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.titlebar-agent-mode__toggle--enabled .titlebar-agent-mode__toggle-slider::after {
+  transform: translateX(10px);
+}
+
+.titlebar-agent-mode__toggle-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+}
+
+.titlebar-agent-mode__toggle--enabled .titlebar-agent-mode__toggle-label {
+  color: #3b82f6;
+}
+
+.titlebar-agent-mode__avatar-btn {
+  padding: 3px 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0.7;
+}
+
+.titlebar-agent-mode__avatar-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.titlebar-agent-mode__avatar-btn--active {
+  background: rgba(255, 107, 157, 0.15);
+  border-color: rgba(255, 107, 157, 0.3);
+  opacity: 1;
+}
+
+.titlebar-agent-mode__info {
+  position: relative;
+}
+
+.titlebar-agent-mode__info-btn {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.titlebar-agent-mode__info-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.titlebar-agent-mode__tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  padding: 12px;
+  background: rgba(20, 20, 30, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  animation: dropdownOpen 0.15s ease-out;
+}
+
+.titlebar-agent-mode__tooltip-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.titlebar-agent-mode__tooltip-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.titlebar-agent-mode__tooltip-interns {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.titlebar-agent-mode__tooltip-intern {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.titlebar-agent-mode__tooltip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Avatar Panel (dropdown) */
+
+.titlebar-agent-mode__avatar-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 280px;
+  padding: 12px;
+  background: rgba(20, 20, 30, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  animation: dropdownOpen 0.2s ease-out;
+}
+
+.titlebar-agent-mode__avatar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.titlebar-agent-mode__avatar-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.titlebar-agent-mode__avatar-status {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.titlebar-agent-mode__avatar-preview {
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.titlebar-agent-mode__avatar-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.titlebar-agent-mode__avatar-icon {
+  font-size: 48px;
+  filter: grayscale(0.3);
+  opacity: 0.9;
+}
+
+.titlebar-agent-mode__avatar-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+

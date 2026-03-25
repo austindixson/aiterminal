@@ -1,3 +1,13 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/hooks/useFileTree.ts
+ * Module: renderer/hooks
+ * Purpose: File tree state management with debounced directory fetching and expand/collapse
+ * Dependencies: react, @/types/file-tree
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/components/FileTree.tsx, /Users/ghost/Desktop/aiterminal/src/main/ipc-handlers.ts
+ * Keywords: file-tree, directory-fetching, debounce, expand-collapse
+ * Last Updated: 2026-03-24
+ */
+
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { FileEntry } from '@/types/file-tree'
 
@@ -31,7 +41,7 @@ export interface UseFileTreeReturn {
 
 export function useFileTree(cwd: string): UseFileTreeReturn {
   const [entries, setEntries] = useState<ReadonlyArray<FileEntry>>([])
-  const [isVisible, setIsVisible] = useState(false)
+  const [isVisible, setIsVisible] = useState(true) // Force visible by default for debugging
   const [showHidden, setShowHidden] = useState(false)
   const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(new Set())
   const [selectedPath, setSelectedPath] = useState<string | null>(null)

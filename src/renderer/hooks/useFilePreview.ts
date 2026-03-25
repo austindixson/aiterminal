@@ -1,3 +1,13 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/hooks/useFilePreview.ts
+ * Module: renderer/hooks
+ * Purpose: File preview state management with LRU cache and scroll position tracking
+ * Dependencies: react, @/types/file-preview, @/file-preview/syntax-highlighter
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/components/FilePreview.tsx, /Users/ghost/Desktop/aiterminal/src/file-preview/syntax-highlighter.ts
+ * Keywords: file-preview, lru-cache, scroll-position, language-detection
+ * Last Updated: 2026-03-24
+ */
+
 import { useState, useCallback, useRef } from 'react'
 import type { FilePreviewState } from '@/types/file-preview'
 import { detectLanguage } from '@/file-preview/syntax-highlighter'

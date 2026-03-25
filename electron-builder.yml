@@ -10,6 +10,10 @@ files:
   - dist/**/*
   - package.json
 
+extraResources:
+  - from: scripts/kokoro-tts-stdio.py
+    to: scripts/kokoro-tts-stdio.py
+
 mac:
   category: public.app-category.developer-tools
   target:

@@ -30,4 +30,7 @@ export interface IAIClient {
    * Throws if the preset name is not recognised.
    */
   setPreset(presetName: string): void;
+
+  /** Current router preset name (e.g. balanced, performance, budget). */
+  getActivePresetName(): string;
 }

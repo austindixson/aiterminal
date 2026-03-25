@@ -9,6 +9,7 @@
     "dev:renderer": "vite",
     "dev:main": "tsc -p tsconfig.main.json && electron .",
     "build": "tsc && vite build",
+    "build:daemon": "cd daemon && npm run build",
     "build:electron": "tsc -p tsconfig.main.json && electron-builder",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,24 +18,29 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@pixiv/three-vrm": "^3.5.1",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-webgl": "^0.19.0",
     "@xterm/xterm": "^6.0.0",
+    "better-sqlite3": "^12.8.0",
     "dotenv": "^17.3.1",
     "node-pty": "^1.0.0",
     "openai": "^4.77.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "three": "^0.183.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.183.1",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^2.1.8",
     "concurrently": "^9.2.1",

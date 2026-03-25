@@ -1,8 +1,18 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/App.tsx
+ * Module: renderer
+ * Purpose: Main app component - orchestrates terminal, chat, file tree, and all UI panels
+ * Dependencies: react, @/ai/types, @/types/*, @/renderer/hooks/*, @/renderer/components/*, @/shell/shell-service
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/main.tsx, /Users/ghost/Desktop/aiterminal/src/renderer/hooks/useChat.ts
+ * Keywords: main-app, terminal, chat, file-tree, nl-routing, tui-mode, keyboard-shortcuts
+ * Last Updated: 2026-03-24
+ */
+
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { FC } from 'react'
 import type { AIResponse } from '@/ai/types'
-import type { AIQueryRequest } from '@/types/index'
 import type { FilePickerResult } from '@/types/file-context'
+import { sanitizeInput, detectPromptInjection } from '@/renderer/utils/sanitizeInput'
 
 // Hooks
 import { useTheme } from '@/renderer/hooks/useTheme'
@@ -14,6 +24,8 @@ import { useFilePicker } from '@/renderer/hooks/useFilePicker'
 import { useDiffView } from '@/renderer/hooks/useDiffView'
 import { useAgent } from '@/renderer/hooks/useAgent'
 import { useFileTree } from '@/renderer/hooks/useFileTree'
+import { useTerminalTabs } from '@/renderer/hooks/useTerminalTabs'
+import { useTerminalLocation } from '@/renderer/hooks/useTerminalLocation'
 
 // Components
 import { TerminalView } from '@/renderer/components/TerminalView'
@@ -26,48 +38,24 @@ import { FilePreview } from '@/renderer/components/FilePreview'
 import { FilePicker } from '@/renderer/components/FilePicker'
 import { DiffView } from '@/renderer/components/DiffView'
 import { AgentApprovalPanel } from '@/renderer/components/AgentApprovalPanel'
-import { FileTree } from '@/renderer/components/FileTree'
+import { AgentMode } from '@/renderer/components/AgentMode'
+import { SplitSidebar } from '@/renderer/components/SplitSidebar'
+import { GatewayVoiceStrip } from '@/renderer/components/GatewayVoiceStrip'
+import { useAgentLoop } from '@/renderer/hooks/useAgentLoop'
 
 // Shell helpers
-import { isNaturalLanguage } from '@/shell/shell-service'
+import {
+  isNaturalLanguage,
+  isTuiCliInvocation,
+  shouldAutoEnableTuiFromPtyOutput,
+} from '@/shell/shell-service'
 
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-function mapIpcResponse(ipcResponse: any): AIResponse {
-  return {
-    content: ipcResponse.content ?? '',
-    model: ipcResponse.model ?? '',
-    inputTokens: ipcResponse.inputTokens ?? 0,
-    outputTokens: ipcResponse.outputTokens ?? ipcResponse.tokens ?? 0,
-    latencyMs: ipcResponse.latencyMs ?? ipcResponse.latency ?? 0,
-    cost: ipcResponse.cost ?? 0,
-  }
-}
-
-function createErrorAIResponse(message: string): AIResponse {
-  return {
-    content: message,
-    model: 'error',
-    inputTokens: 0,
-    outputTokens: 0,
-    latencyMs: 0,
-    cost: 0,
-  }
-}
-
-/**
- * Parse [RUN]command[/RUN] tags from AI response.
- * Returns { command, cleanContent } or null if no RUN tag.
- */
-function parseAutoRun(content: string): { command: string; cleanContent: string } | null {
-  const match = content.match(/\[RUN\](.*?)\[\/RUN\]/s)
-  if (!match) return null
-  const command = match[1].trim()
-  const cleanContent = content.replace(/\[RUN\].*?\[\/RUN\]/s, '').trim()
-  return { command, cleanContent }
-}
+// Note: Auto-run helpers (mapIpcResponse, parseAutoRun) removed - currently unused
+// They can be restored when AI auto-run functionality is re-implemented
 
 // ---------------------------------------------------------------------------
 // App
@@ -85,85 +73,131 @@ export const App: FC = () => {
   const filePreview = useFilePreview()
   const diffView = useDiffView()
   const agent = useAgent()
+  const agentLoop = useAgentLoop({ enabled: false })  // Start disabled
+  const terminalTabs = useTerminalTabs()
+  const terminalLocation = useTerminalLocation()
 
   // NL routing toast
   const [nlToast, setNlToast] = useState<string | null>(null)
 
-  // CWD state — fetched from electron or defaults to home
-  const [cwd, setCwd] = useState('')
+  // TUI Mode: disable natural language interception for CLI tools
+  const [tuiMode, setTuiMode] = useState(false)
+  /** Same as `tuiMode` but updated synchronously — NL routing must not wait for re-render. */
+  const tuiModeRef = useRef(false)
 
   useEffect(() => {
+    tuiModeRef.current = tuiMode
+  }, [tuiMode])
+
+  // Active terminal session cwd (file tree + picker); synced from PTY via main process
+  const [activeTabCwd, setActiveTabCwd] = useState('')
+
+  // Refresh cwd when switching tabs (probes real shell cwd from PTY pid)
+  useEffect(() => {
+    const activeTabId = terminalTabs.state.activeTabId
+    if (!activeTabId) return
+
+    const sessionId = terminalTabs.getActiveSessionId()
+    if (!sessionId) return
+
     const hasElectronAPI =
       typeof window !== 'undefined' &&
       'electronAPI' in window &&
-      window.electronAPI?.getAutocompleteContext
+      window.electronAPI?.getSessionCwd
 
-    if (hasElectronAPI) {
-      window.electronAPI.getAutocompleteContext().then((ctx) => {
-        setCwd(ctx.cwd)
-      }).catch(() => {
-        // fallback — no-op
-      })
+    if (!hasElectronAPI) return
+
+    let cancelled = false
+    window.electronAPI.getSessionCwd(sessionId).then((result) => {
+      if (cancelled) return
+      if (result.success && result.cwd) {
+        setActiveTabCwd(result.cwd)
+      }
+    }).catch(() => {
+      /* keep previous cwd */
+    })
+    return () => {
+      cancelled = true
     }
-  }, [])
+  }, [terminalTabs.state.activeTabId, terminalTabs])
 
-  const fileTree = useFileTree(cwd)
-  const filePicker = useFilePicker(cwd)
+  const fileTree = useFileTree(activeTabCwd)
+  const filePicker = useFilePicker(activeTabCwd)
 
   // -------------------------------------------------------------------------
   // AI response state (existing)
   // -------------------------------------------------------------------------
 
   const [aiResponse, setAIResponse] = useState<AIResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading] = useState(false) // Loading state for future AI responses
   const lastCommandRef = useRef<string>('')
 
   const handleDismiss = useCallback(() => {
     setAIResponse(null)
   }, [])
 
-  // Handle AI response — auto-execute [RUN] commands
-  const processAIResponse = useCallback((response: any) => {
-    const mapped = mapIpcResponse(response)
-    const autoRun = parseAutoRun(mapped.content)
-
-    if (autoRun && autoRun.command) {
-      const hasElectronAPI = typeof window !== 'undefined' && 'electronAPI' in window
-      if (hasElectronAPI) {
-        window.electronAPI.writeToPty(autoRun.command + '\r')
-      }
-
-      if (autoRun.cleanContent) {
-        setAIResponse({ ...mapped, content: `Ran: \`${autoRun.command}\`\n\n${autoRun.cleanContent}` })
-      } else {
-        setAIResponse({ ...mapped, content: `Ran: \`${autoRun.command}\`` })
-      }
-      setTimeout(() => setAIResponse(null), 3000)
-    } else {
-      setAIResponse(mapped)
-    }
+  // Toggle TUI mode (disable NL interception)
+  const toggleTuiMode = useCallback(() => {
+    setTuiMode((prev) => {
+      const next = !prev
+      tuiModeRef.current = next
+      return next
+    })
   }, [])
 
   const handleCommand = useCallback((input: string): boolean => {
     const trimmed = input.trim()
     if (trimmed.length === 0) return false
 
-    if (isNaturalLanguage(trimmed)) {
+    // SECURITY: Sanitize input to prevent prompt injection and control char abuse
+    const { sanitized, error: sanitizeError } = sanitizeInput(trimmed, {
+      maxLength: 10_000,
+      stripAnsiCodes: true,
+    })
+
+    if (sanitizeError) {
+      console.warn('[App] Input sanitization warning:', sanitizeError)
+    }
+
+    // Check for potential prompt injection attacks
+    if (detectPromptInjection(sanitized)) {
+      console.warn('[App] Potential prompt injection detected, blocking')
+      // Still send to PTY (it's a shell command), don't route to AI
+      lastCommandRef.current = sanitized
+      return false
+    }
+
+    // Claude Code / similar TUIs — set ref synchronously so the *next* Enter in the same
+    // turn can't hit NL routing before React re-renders (TUI badge on but chat still steals).
+    if (isTuiCliInvocation(sanitized)) {
+      tuiModeRef.current = true
+      setTuiMode(true)
+    }
+
+    // Skip natural language detection when in TUI mode (read ref, not stale state)
+    if (!tuiModeRef.current && isNaturalLanguage(sanitized)) {
       // Show brief toast so the user knows their input was routed
-      setNlToast(trimmed)
+      setNlToast(sanitized)
       setTimeout(() => setNlToast(null), 2500)
 
       // Route to chat sidebar — auto-opens and sends as a chat message
-      chat.injectFromTerminal(trimmed) // fire-and-forget (async)
+      chat.injectFromTerminal(sanitized) // fire-and-forget (async)
       return true // signal TerminalView to NOT send Enter to PTY
     }
+
     // Shell commands go directly through PTY — save for error detection
-    lastCommandRef.current = trimmed
+    lastCommandRef.current = sanitized
     return false
   }, [chat.injectFromTerminal])
 
   // Monitor PTY output for error patterns → route to chat sidebar
+  // Also detect successful cd commands to update file tree
   const handlePtyOutput = useCallback((data: string) => {
+    if (!tuiModeRef.current && shouldAutoEnableTuiFromPtyOutput(data)) {
+      tuiModeRef.current = true
+      setTuiMode(true)
+    }
+
     const errorPatterns = [
       /command not found/i,
       /No such file or directory/i,
@@ -172,13 +206,44 @@ export const App: FC = () => {
     ]
 
     const cmd = lastCommandRef.current
-    if (cmd && errorPatterns.some(p => p.test(data))) {
-      const capturedCmd = cmd
-      lastCommandRef.current = ''
-      // Send error context to chat sidebar
-      chat.injectFromTerminal(`Command \`${capturedCmd}\` failed: ${data.trim()}`)
+    if (cmd) {
+      // Check for errors first
+      if (errorPatterns.some(p => p.test(data))) {
+        const capturedCmd = cmd
+        lastCommandRef.current = ''
+        // Send error context to chat sidebar
+        chat.injectFromTerminal(`Command \`${capturedCmd}\` failed: ${data.trim()}`)
+        return
+      }
+
+      // Detect successful cd — refresh cwd from PTY (not Electron process.cwd)
+      const trimmedCmd = cmd.trim()
+      const isCd = trimmedCmd === 'cd' || trimmedCmd.startsWith('cd ')
+      if (isCd) {
+        lastCommandRef.current = ''
+
+        const sessionId = terminalTabs.getActiveSessionId()
+        if (!sessionId) return
+
+        const hasElectronAPI =
+          typeof window !== 'undefined' &&
+          'electronAPI' in window &&
+          window.electronAPI?.getSessionCwd
+
+        if (hasElectronAPI) {
+          setTimeout(() => {
+            window.electronAPI.getSessionCwd(sessionId).then((result) => {
+              if (result.success && result.cwd) {
+                setActiveTabCwd(result.cwd)
+              }
+            }).catch(() => {
+              /* ignore */
+            })
+          }, 100)
+        }
+      }
     }
-  }, [chat.injectFromTerminal])
+  }, [chat.injectFromTerminal, terminalTabs])
 
   // -------------------------------------------------------------------------
   // Keyboard shortcuts
@@ -206,6 +271,20 @@ export const App: FC = () => {
       if (isMeta && e.shiftKey && e.key === 'f') {
         e.preventDefault()
         fileTree.toggleVisible()
+        return
+      }
+
+      // Cmd+Opt+T — Toggle terminal location
+      if (isMeta && e.altKey && e.key === 't') {
+        e.preventDefault()
+        terminalLocation.toggle()
+        return
+      }
+
+      // Cmd+Shift+T — Toggle TUI mode (disable NL interception)
+      if (isMeta && e.shiftKey && e.key === 't') {
+        e.preventDefault()
+        toggleTuiMode()
         return
       }
 
@@ -250,6 +329,8 @@ export const App: FC = () => {
     filePicker.state.isOpen, filePicker.open, filePicker.dismiss,
     filePreview.state.isOpen, filePreview.close,
     diffView.state.isOpen, diffView.close,
+    terminalLocation.toggle,
+    toggleTuiMode,
   ])
 
   // -------------------------------------------------------------------------
@@ -259,6 +340,32 @@ export const App: FC = () => {
   const handleFileTreeSelect = useCallback((path: string) => {
     filePreview.openFile(path)
   }, [filePreview.openFile])
+
+  const handleFileTreeSelectDirectory = useCallback((path: string) => {
+    // Send cd command to active terminal
+    const cdCommand = `cd "${path}"\r`
+    terminalTabs.writeToActive(cdCommand)
+  }, [terminalTabs.writeToActive])
+
+  const handleFileTreeGoToParent = useCallback(() => {
+    terminalTabs.writeToActive('cd ..\r')
+    const sessionId = terminalTabs.getActiveSessionId()
+    if (!sessionId) return
+    const hasElectronAPI =
+      typeof window !== 'undefined' &&
+      'electronAPI' in window &&
+      window.electronAPI?.getSessionCwd
+    if (!hasElectronAPI) return
+    setTimeout(() => {
+      window.electronAPI.getSessionCwd(sessionId).then((result) => {
+        if (result.success && result.cwd) {
+          setActiveTabCwd(result.cwd)
+        }
+      }).catch(() => {
+        /* ignore */
+      })
+    }, 120)
+  }, [terminalTabs])
 
   // -------------------------------------------------------------------------
   // Chat @mention -> file picker connection
@@ -364,37 +471,102 @@ export const App: FC = () => {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div className="titlebar">
         <span className="titlebar__title">AITerminal</span>
+        <GatewayVoiceStrip />
+
+        {/* VS Code-style toggles (top-right) */}
+        <div className="titlebar__toggles">
+          <AgentMode
+            enabled={agentLoop.enabled}
+            onToggle={agentLoop.setEnabled}
+            activeIntern={agentLoop.activeIntern}
+            isRunning={agentLoop.isRunning}
+            status={agentLoop.isRunning ? 'running' : 'idle'}
+          />
+          <button
+            type="button"
+            className="titlebar__toggle"
+            onClick={fileTree.toggleVisible}
+            title={fileTree.isVisible ? "Hide Sidebar (Cmd+Shift+F)" : "Show Sidebar (Cmd+Shift+F)"}
+            aria-label="Toggle sidebar"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1 3h5v1H1V3zm6 0h5v1H7V3zm1 2h3v1H8V5zm-7 2h5v1H1V7zm6 0h5v1H7V7zm1 2h3v1H8V9zm-7 2h5v1H1v-1zm6 0h5v1H7v-1zm1 2h3v1H8v-1z"/>
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="titlebar__toggle"
+            onClick={chat.toggle}
+            title={chat.state.isOpen ? "Hide Chat (Cmd+B)" : "Show Chat (Cmd+B)"}
+            aria-label="Toggle chat"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1 3h14v1H1V3zm0 3h14v1H1V6zm0 3h10v1H1V9zm0 3h10v1H1v-1z"/>
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="titlebar__toggle"
+            onClick={terminalLocation.toggle}
+            title={terminalLocation.state.location === 'center' ? "Move terminal to bottom" : "Move terminal to center"}
+            aria-label="Toggle terminal location"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1 3h14v1H1V3zm0 3h14v1H1V6zm0 3h14v1H1V9zm0 3h10v1H1v-1z"/>
+            </svg>
+          </button>
+          <ThemeSelector />
+        </div>
       </div>
 
-      {/* Theme selector (top-right, fixed) */}
-      <ThemeSelector />
+      {/* Theme selector removed from here, now in titlebar */}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/*  Main content: file tree | terminal area | chat sidebar           */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="app-main">
-        {/* ── File Tree (left panel) ── */}
+      <div className={`app-main app-main--terminal-${terminalLocation.state.location}`}>
+        {/* ── Split Sidebar (left panel: terminal tabs + file tree) ── */}
         {fileTree.isVisible && (
-          <div className="file-tree-container">
-            <FileTree
-              cwd={cwd}
-              entries={fileTree.entries}
-              isVisible={fileTree.isVisible}
-              onToggle={fileTree.toggleVisible}
-              onFileSelect={handleFileTreeSelect}
-            />
-          </div>
+          <SplitSidebar
+            tabs={terminalTabs.state.tabs}
+            activeTabId={terminalTabs.state.activeTabId}
+            onTabClick={terminalTabs.switchTab}
+            onTabClose={terminalTabs.closeTab}
+            onNewTab={() => terminalTabs.createTab()}
+            fileTreeCwd={activeTabCwd}
+            fileTreeEntries={fileTree.entries}
+            fileTreeVisible={fileTree.isVisible}
+            onFileTreeToggle={fileTree.toggleVisible}
+            onFileTreeSelectFile={handleFileTreeSelect}
+            onFileTreeSelectDirectory={handleFileTreeSelectDirectory}
+            onFileTreeGoToParent={handleFileTreeGoToParent}
+          />
         )}
 
         {/* ── Terminal area (center) ── */}
         <div className="terminal-area">
           {/* Terminal */}
           <div className={`terminal-section${hasBottomPanel ? ' terminal-section--with-ai' : ''}`}>
-            <TerminalView
-              onCommand={handleCommand}
-              onPtyOutput={handlePtyOutput}
-              theme={activeTheme}
-            />
+            <div className="terminal-stack">
+              {terminalTabs.state.tabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  className={
+                    tab.isActive
+                      ? 'terminal-stack__layer'
+                      : 'terminal-stack__layer terminal-stack__layer--inactive'
+                  }
+                >
+                  <TerminalView
+                    onCommand={handleCommand}
+                    onPtyOutput={handlePtyOutput}
+                    theme={activeTheme}
+                    sessionId={tab.sessionId}
+                    isActive={tab.isActive}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Bottom panels: AI Response / Agent / Diff */}
@@ -505,6 +677,21 @@ export const App: FC = () => {
         <div className="statusbar__item">
           <span>{activeTheme.displayName}</span>
         </div>
+        {chat.state.activeModelLabel && (
+          <>
+            <div className="statusbar__separator" />
+            <div
+              className="statusbar__item"
+              title={
+                chat.state.activeModelId
+                  ? `Model: ${chat.state.activeModelId}`
+                  : undefined
+              }
+            >
+              <span style={{ opacity: 0.9 }}>{chat.state.activeModelLabel}</span>
+            </div>
+          </>
+        )}
         <div className="statusbar__separator" />
         <div className="statusbar__item">
           <span
@@ -516,10 +703,19 @@ export const App: FC = () => {
           />
           <span>{isAIActive ? 'AI Active' : 'AI Ready'}</span>
         </div>
+        {tuiMode && (
+          <>
+            <div className="statusbar__separator" />
+            <div className="statusbar__item">
+              <span style={{ color: 'var(--ansi-cyan)', fontWeight: 600 }}>TUI MODE</span>
+            </div>
+          </>
+        )}
         <div style={{ flex: 1 }} />
         <div className="statusbar__shortcuts">
           <kbd className="statusbar__kbd" title="Command palette">&#x2318;K</kbd>
           <kbd className="statusbar__kbd" title="Toggle chat">&#x2318;B</kbd>
+          <kbd className="statusbar__kbd" title="Toggle TUI mode">&#x2318;⇧T</kbd>
           <kbd className="statusbar__kbd" title="File picker">&#x2318;P</kbd>
         </div>
         <div className="statusbar__separator" />

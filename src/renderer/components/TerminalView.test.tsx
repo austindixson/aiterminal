@@ -20,7 +20,7 @@ const { mockTerminalInstance, MockTerminal } = vi.hoisted(() => {
   return { mockTerminalInstance: instance, MockTerminal: ctor }
 })
 
-vi.mock('xterm', () => ({
+vi.mock('@xterm/xterm', () => ({
   Terminal: MockTerminal,
 }))
 
@@ -28,6 +28,7 @@ vi.mock('@xterm/addon-fit', () => ({
   FitAddon: vi.fn().mockImplementation(() => ({
     fit: vi.fn(),
     dispose: vi.fn(),
+    activate: vi.fn(),
   })),
 }))
 
@@ -75,25 +76,26 @@ import { TerminalView } from './TerminalView'
 
 describe('TerminalView', () => {
   const onCommand = vi.fn()
+  const sessionId = 'test-session-id'
 
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('renders a terminal container div', () => {
-    render(<TerminalView onCommand={onCommand} theme={mockTheme} />)
+    render(<TerminalView onCommand={onCommand} theme={mockTheme} sessionId={sessionId} />)
 
     const container = screen.getByTestId('terminal-view')
     expect(container).toBeInTheDocument()
   })
 
   it('applies theme colors via xterm options', () => {
-    render(<TerminalView onCommand={onCommand} theme={mockTheme} />)
+    render(<TerminalView onCommand={onCommand} theme={mockTheme} sessionId={sessionId} />)
 
     expect(MockTerminal).toHaveBeenCalledWith(
       expect.objectContaining({
         theme: expect.objectContaining({
-          background: '#282A36',
+          background: 'rgba(40, 42, 54, 0)',
           foreground: '#F8F8F2',
           cursor: '#F8F8F2',
         }),
@@ -102,7 +104,7 @@ describe('TerminalView', () => {
   })
 
   it('calls onCommand when user presses Enter', () => {
-    render(<TerminalView onCommand={onCommand} theme={mockTheme} />)
+    render(<TerminalView onCommand={onCommand} theme={mockTheme} sessionId={sessionId} />)
 
     // Grab the callback passed to terminal.onData
     const onDataCb = mockTerminalInstance.onData.mock.calls[0]?.[0]
@@ -120,8 +122,41 @@ describe('TerminalView', () => {
     expect(onCommand).toHaveBeenCalledWith('ls -la')
   })
 
+  it('when NL is handled, clears the line with Ctrl+U (no SIGINT) and erases typed text in xterm', () => {
+    const writeToSession = vi.fn()
+    const w = window as unknown as {
+      electronAPI?: { writeToSession: typeof writeToSession; onSessionData: () => () => void }
+    }
+    const prev = w.electronAPI
+    w.electronAPI = {
+      writeToSession,
+      onSessionData: vi.fn(() => () => {}),
+    }
+    try {
+      const onCommandNl = vi.fn().mockReturnValue(true)
+      render(<TerminalView onCommand={onCommandNl} theme={mockTheme} sessionId={sessionId} />)
+
+      const onDataCb = mockTerminalInstance.onData.mock.calls[0]?.[0]
+      expect(onDataCb).toBeDefined()
+
+      onDataCb('h')
+      onDataCb('i')
+      onDataCb('\r')
+
+      expect(onCommandNl).toHaveBeenCalledWith('hi')
+      expect(writeToSession).toHaveBeenCalledWith(sessionId, '\x15')
+      expect(mockTerminalInstance.write).toHaveBeenCalledWith('\b\b\x1b[K')
+    } finally {
+      if (prev !== undefined) {
+        w.electronAPI = prev
+      } else {
+        delete w.electronAPI
+      }
+    }
+  })
+
   it('opens xterm Terminal into the container div', () => {
-    render(<TerminalView onCommand={onCommand} theme={mockTheme} />)
+    render(<TerminalView onCommand={onCommand} theme={mockTheme} sessionId={sessionId} />)
 
     expect(mockTerminalInstance.open).toHaveBeenCalledWith(
       expect.any(HTMLElement),
@@ -129,14 +164,14 @@ describe('TerminalView', () => {
   })
 
   it('loads the FitAddon', () => {
-    render(<TerminalView onCommand={onCommand} theme={mockTheme} />)
+    render(<TerminalView onCommand={onCommand} theme={mockTheme} sessionId={sessionId} />)
 
     expect(mockTerminalInstance.loadAddon).toHaveBeenCalled()
   })
 
   it('disposes xterm Terminal on unmount', () => {
     const { unmount } = render(
-      <TerminalView onCommand={onCommand} theme={mockTheme} />,
+      <TerminalView onCommand={onCommand} theme={mockTheme} sessionId={sessionId} />,
     )
 
     unmount()

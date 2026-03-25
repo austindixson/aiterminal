@@ -1,3 +1,13 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/components/AIResponsePanel.tsx
+ * Module: renderer/components
+ * Purpose: Display AI response with model info, token count, and latency metrics
+ * Dependencies: react, @/ai/types
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/App.tsx, /Users/ghost/Desktop/aiterminal/src/ai/client.ts
+ * Keywords: ai-response, display-panel, model-info, tokens, latency
+ * Last Updated: 2026-03-24
+ */
+
 import type { FC } from 'react'
 import type { AIResponse } from '@/ai/types'
 

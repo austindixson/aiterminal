@@ -25,6 +25,11 @@ describe('useChat', () => {
     // In jsdom, window already exists — attach electronAPI directly
     ;(window as any).electronAPI = {
       aiQuery: mockAiQuery,
+      getActiveAiModel: vi.fn().mockResolvedValue({
+        id: 'openai/gpt-4o-2024-11-20',
+        displayName: 'GPT-4o',
+        presetName: 'balanced',
+      }),
       readDirectory: vi.fn().mockResolvedValue([]),
       readDirectoryTree: vi.fn().mockResolvedValue([]),
       executeCommand: vi.fn(),
@@ -51,7 +56,7 @@ describe('useChat', () => {
 
     expect(result.current.state.isOpen).toBe(false)
     expect(result.current.state.messages).toEqual([])
-    expect(result.current.state.width).toBe(380)
+    expect(result.current.state.width).toBe(420)
     expect(result.current.state.inputValue).toBe('')
     expect(result.current.state.isStreaming).toBe(false)
     expect(result.current.state.attachedFiles).toEqual([])
@@ -103,7 +108,7 @@ describe('useChat', () => {
   // 3. setWidth
   // -------------------------------------------------------------------------
 
-  it('setWidth() updates width within bounds (clamped 280-600)', () => {
+  it('setWidth() updates width within bounds (clamped 280-640)', () => {
     const { result } = renderHook(() => useChat())
 
     act(() => {
@@ -121,13 +126,13 @@ describe('useChat', () => {
     expect(result.current.state.width).toBe(280)
   })
 
-  it('setWidth() clamps to maximum of 600', () => {
+  it('setWidth() clamps to maximum of 640', () => {
     const { result } = renderHook(() => useChat())
 
     act(() => {
       result.current.setWidth(900)
     })
-    expect(result.current.state.width).toBe(600)
+    expect(result.current.state.width).toBe(640)
   })
 
   // -------------------------------------------------------------------------

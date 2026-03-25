@@ -1,3 +1,13 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/components/FilePreview.tsx
+ * Module: renderer/components
+ * Purpose: Display file content with syntax highlighting, line numbers, and scroll position tracking
+ * Dependencies: react, @/types/file-preview, @/file-preview/syntax-highlighter
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/hooks/useFilePreview.ts, /Users/ghost/Desktop/aiterminal/src/file-preview/syntax-highlighter.ts
+ * Keywords: file-preview, syntax-highlighting, line-numbers, scroll-tracking
+ * Last Updated: 2026-03-24
+ */
+
 import { useCallback, useMemo } from 'react'
 import type { FC } from 'react'
 import type { FilePreviewState } from '@/types/file-preview'

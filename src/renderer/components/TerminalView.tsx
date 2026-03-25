@@ -1,3 +1,13 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/components/TerminalView.tsx
+ * Module: renderer/components
+ * Purpose: xterm.js terminal wrapper - handles PTY I/O, resize, focus, and natural language interception
+ * Dependencies: react, @xterm/xterm, @xterm/addon-fit, @/themes/types, @/themes/theme-manager
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/App.tsx, /Users/ghost/Desktop/aiterminal/src/main/terminal-session-manager.ts
+ * Keywords: terminal, xterm, pty, fit-addon, resize, focus, natural-language
+ * Last Updated: 2026-03-24
+ */
+
 import { useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -9,16 +19,30 @@ export interface TerminalViewProps {
   readonly onCommand: (input: string) => boolean
   readonly onPtyOutput?: (data: string) => void
   readonly theme: Theme
+  readonly sessionId: string | null
+  /** When false, terminal is hidden (another tab is active) — skip focus; refit when true again. */
+  readonly isActive?: boolean
 }
 
-export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutput, theme }) => {
+export const TerminalView: React.FC<TerminalViewProps> = ({
+  onCommand,
+  onPtyOutput,
+  theme,
+  sessionId,
+  isActive = true,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
+  const fitAddonRef = useRef<FitAddon | null>(null)
   const inputBufferRef = useRef<string>('')
   const onCommandRef = useRef(onCommand)
   const onPtyOutputRef = useRef(onPtyOutput)
+  const sessionIdRef = useRef(sessionId)
+  const isActiveRef = useRef(isActive)
   onCommandRef.current = onCommand
   onPtyOutputRef.current = onPtyOutput
+  sessionIdRef.current = sessionId
+  isActiveRef.current = isActive
 
   useEffect(() => {
     const container = containerRef.current
@@ -38,23 +62,33 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutp
     })
 
     const fitAddon = new FitAddon()
+    fitAddonRef.current = fitAddon
     terminal.loadAddon(fitAddon)
     terminal.open(container)
 
     try { fitAddon.fit() } catch { /* ignore zero-dimension errors */ }
 
-    const hasElectronAPI = typeof window !== 'undefined' && 'electronAPI' in window
+    const api = typeof window !== 'undefined' ? window.electronAPI : undefined
 
-    // PTY output → xterm
-    if (hasElectronAPI) {
-      window.electronAPI.onPtyData((data: string) => {
-        terminal.write(data)
-        onPtyOutputRef.current?.(data)
-      })
-    }
+    const sid = sessionIdRef.current
+    const unsubscribe =
+      sid && api?.onSessionData
+        ? api.onSessionData(sid, (data: string) => {
+            terminal.write(data)
+            if (isActiveRef.current) {
+              onPtyOutputRef.current?.(data)
+            }
+          })
+        : () => {}
+
+    // Store unsubscribe for cleanup (use `terminal` — ref is assigned below)
+    ;(terminal as unknown as { _sessionUnsubscribe?: () => void })._sessionUnsubscribe =
+      unsubscribe
 
     // Keystrokes → PTY + command tracking
     const dataDisposable = terminal.onData((data: string) => {
+      let skipPtyWrite = false
+
       if (data === '\r' || data === '\n') {
         const command = inputBufferRef.current
         inputBufferRef.current = ''
@@ -62,24 +96,43 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutp
         if (command.length > 0) {
           const handled = onCommandRef.current(command)
           if (handled) {
-            // Natural language was routed to chat — clear the shell line
-            // (chars were already echoed to PTY while typing)
-            if (hasElectronAPI) {
-              window.electronAPI.writeToPty('\x15\r') // Ctrl+U: kill line + newline for clean prompt
+            // Natural language — do not send Enter to the shell; keep PTY buffer in sync
+            // and avoid Ctrl+C (would print ^C and extra prompts / clutter).
+            skipPtyWrite = true
+            const cells = [...command].length
+            if (cells > 0) {
+              // Erase what the user typed from the xterm buffer (cursor is after the text).
+              terminal.write('\b'.repeat(cells) + '\x1b[K')
             }
-            return // don't send Enter to PTY
+            if (api) {
+              // Readline/zle: Ctrl+U clears the current line in the shell without SIGINT.
+              const clearLine = '\x15'
+              if (sessionIdRef.current) {
+                api.writeToSession(sessionIdRef.current, clearLine)
+              } else {
+                api.writeToPty(clearLine)
+              }
+            }
           }
+          // For shell commands: don't skip Enter (let it execute normally)
         }
       } else if (data === '\x7f') {
+        // Backspace — remove from input buffer
         if (inputBufferRef.current.length > 0) {
           inputBufferRef.current = inputBufferRef.current.slice(0, -1)
         }
       } else {
+        // Regular character — add to input buffer
         inputBufferRef.current += data
       }
 
-      if (hasElectronAPI) {
-        window.electronAPI.writeToPty(data)
+      // Send to PTY (unless skipped for NL handling)
+      if (api && !skipPtyWrite) {
+        if (sessionIdRef.current) {
+          api.writeToSession(sessionIdRef.current, data)
+        } else {
+          api.writeToPty(data)
+        }
       }
     })
 
@@ -87,8 +140,12 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutp
     const handleResize = () => {
       try {
         fitAddon.fit()
-        if (hasElectronAPI && terminal.cols && terminal.rows) {
-          window.electronAPI.resizePty(terminal.cols, terminal.rows)
+        if (api && terminal.cols && terminal.rows) {
+          if (sessionIdRef.current) {
+            api.resizeSession(sessionIdRef.current, terminal.cols, terminal.rows)
+          } else {
+            api.resizePty(terminal.cols, terminal.rows)
+          }
         }
       } catch { /* ignore */ }
     }
@@ -105,11 +162,32 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ onCommand, onPtyOutp
       resizeObserver.disconnect()
       window.removeEventListener('resize', handleResize)
       dataDisposable.dispose()
+      const t = terminal as unknown as { _sessionUnsubscribe?: () => void }
+      t._sessionUnsubscribe?.()
       terminal.dispose()
       terminalRef.current = null
+      fitAddonRef.current = null
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme])
+  }, [theme, sessionId])
+
+  // Update sessionId ref when it changes (for immediate access in effects)
+  useEffect(() => {
+    sessionIdRef.current = sessionId
+  }, [sessionId])
+
+  // After tab switch, refit and focus so prompt redraws and input goes to the visible shell
+  useEffect(() => {
+    if (!isActive) return
+    const id = requestAnimationFrame(() => {
+      try {
+        fitAddonRef.current?.fit()
+        terminalRef.current?.focus()
+      } catch {
+        /* ignore */
+      }
+    })
+    return () => cancelAnimationFrame(id)
+  }, [isActive])
 
   return (
     <div

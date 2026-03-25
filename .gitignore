@@ -5,6 +5,9 @@ node_modules/
 dist/
 out/
 
+# Python (Kokoro TTS sidecar)
+.venv-kokoro/
+
 # Environment
 .env
 .env.local

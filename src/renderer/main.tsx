@@ -1,3 +1,13 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/main.tsx
+ * Module: renderer
+ * Purpose: React entry point - renders App component to DOM
+ * Dependencies: react-dom, @xterm/xterm, react components
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/App.tsx
+ * Keywords: entry-point, react-root, xterm-css, global-styles
+ * Last Updated: 2026-03-24
+ */
+
 import { createRoot } from "react-dom/client";
 import "@xterm/xterm/css/xterm.css";
 import { App } from "./App";

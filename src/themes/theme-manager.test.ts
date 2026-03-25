@@ -135,7 +135,8 @@ describe('themeToXtermOptions(theme)', () => {
   it('maps background and foreground correctly', () => {
     const opts = themeToXtermOptions(dracula)
 
-    expect(opts.background).toBe(dracula.colors.background)
+    // xterm background uses fully transparent rgba for glass/underlay compositing
+    expect(opts.background).toBe('rgba(40, 42, 54, 0)')
     expect(opts.foreground).toBe(dracula.colors.foreground)
   })
 

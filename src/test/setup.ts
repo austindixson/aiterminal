@@ -6,9 +6,8 @@ import { vi } from 'vitest';
 // ---------------------------------------------------------------------------
 
 globalThis.ResizeObserver = class ResizeObserver {
-  private callback: ResizeObserverCallback;
-  constructor(callback: ResizeObserverCallback) {
-    this.callback = callback;
+  constructor(_callback: ResizeObserverCallback) {
+    void _callback;
   }
   observe(): void { /* noop */ }
   unobserve(): void { /* noop */ }

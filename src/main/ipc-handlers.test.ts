@@ -1,3 +1,13 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/main/ipc-handlers.test.ts
+ * Module: main/test
+ * Purpose: Unit tests for IPC handlers — command execution, AI queries, theme management, PTY bridge
+ * Dependencies: vitest, ipc-handlers, IAIClient, Theme types
+ * Related: /Users/ghost/Desktop/aiterminal/src/main/ipc-handlers.ts
+ * Keywords: test, IPC, handlers, command-execution, AI-queries, theme-management, PTY-bridge, unit-tests, mocks
+ * Last Updated: 2026-03-24
+ */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import {
@@ -9,12 +19,23 @@ import {
 } from './ipc-handlers';
 
 import type { IAIClient } from '@/ai/client';
-import type { AIRequest, AIResponse, ModelConfig, TaskType } from '@/ai/types';
 import type { Theme } from '@/themes/types';
 
 // ---------------------------------------------------------------------------
 // Mock factories
 // ---------------------------------------------------------------------------
+
+/** Vitest mock typing can infer `never` for PTY callbacks; narrow explicitly. */
+function callDataCb(cb: ((data: string) => void) | null, data: string): void {
+  if (cb) (cb as (d: string) => void)(data);
+}
+
+function callExitCb(
+  cb: ((exitResult: { exitCode: number; signal?: number }) => void) | null,
+  exitResult: { exitCode: number; signal?: number },
+): void {
+  if (cb) (cb as (e: { exitCode: number; signal?: number }) => void)(exitResult);
+}
 
 function createMockPty() {
   return {
@@ -36,7 +57,7 @@ function createMockPty() {
 
 function createMockAIClient(overrides: Partial<IAIClient> = {}): IAIClient {
   return {
-    query: vi.fn<[AIRequest], Promise<AIResponse>>().mockResolvedValue({
+    query: vi.fn().mockResolvedValue({
       content: 'Mock AI response',
       model: 'test-model',
       inputTokens: 10,
@@ -45,7 +66,7 @@ function createMockAIClient(overrides: Partial<IAIClient> = {}): IAIClient {
       cost: 0.001,
     }),
     streamQuery: vi.fn(),
-    getActiveModel: vi.fn<[TaskType], ModelConfig>().mockReturnValue({
+    getActiveModel: vi.fn().mockReturnValue({
       id: 'test-model',
       name: 'Test Model',
       provider: 'test',
@@ -55,6 +76,7 @@ function createMockAIClient(overrides: Partial<IAIClient> = {}): IAIClient {
       contextWindow: 128_000,
     }),
     setPreset: vi.fn(),
+    getActivePresetName: vi.fn().mockReturnValue('balanced'),
     ...overrides,
   };
 }
@@ -117,12 +139,8 @@ describe('createCommandHandler', () => {
     const resultPromise = handler('echo hello');
 
     // Simulate data flowing back from PTY
-    if (dataCallback) {
-      dataCallback('hello\n');
-    }
-    if (exitCallback) {
-      exitCallback({ exitCode: 0 });
-    }
+    callDataCb(dataCallback, 'hello\n');
+    callExitCb(exitCallback, { exitCode: 0 });
 
     const result = await resultPromise;
 
@@ -149,12 +167,8 @@ describe('createCommandHandler', () => {
 
     const resultPromise = handler('nonexistent-cmd');
 
-    if (dataCallback) {
-      dataCallback('zsh: command not found: nonexistent-cmd\n');
-    }
-    if (exitCallback) {
-      exitCallback({ exitCode: 127 });
-    }
+    callDataCb(dataCallback, 'zsh: command not found: nonexistent-cmd\n');
+    callExitCb(exitCallback, { exitCode: 127 });
 
     const result = await resultPromise;
 
@@ -200,9 +214,7 @@ describe('createCommandHandler', () => {
 
     const resultPromise = handler('ls');
 
-    if (exitCallback) {
-      exitCallback({ exitCode: 0 });
-    }
+    callExitCb(exitCallback, { exitCode: 0 });
 
     await resultPromise;
 
@@ -395,21 +407,23 @@ describe('createPtyBridge', () => {
       return { dispose: vi.fn() };
     });
 
-    const bridge = createPtyBridge(mockWindow, mockPty);
+    const sessionId = 'test-session-pty';
+    const bridge = createPtyBridge(mockWindow, mockPty, sessionId);
 
     expect(bridge).toBeDefined();
     expect(mockPty.onData).toHaveBeenCalled();
 
-    // Simulate PTY data
-    if (dataCallback) {
-      dataCallback('some output');
-    }
+    callDataCb(dataCallback, 'some output');
 
-    expect(mockWindow.webContents.send).toHaveBeenCalledWith('pty-data', 'some output');
+    expect(mockWindow.webContents.send).toHaveBeenCalledWith(
+      'session-data',
+      sessionId,
+      'some output',
+    );
   });
 
   it('writes data from renderer to PTY', () => {
-    const bridge = createPtyBridge(mockWindow, mockPty);
+    const bridge = createPtyBridge(mockWindow, mockPty, 'sid');
 
     bridge.writeToPty('ls -la\r');
 
@@ -417,7 +431,7 @@ describe('createPtyBridge', () => {
   });
 
   it('resizes PTY when terminal resizes', () => {
-    const bridge = createPtyBridge(mockWindow, mockPty);
+    const bridge = createPtyBridge(mockWindow, mockPty, 'sid');
 
     bridge.resizePty(120, 40);
 
@@ -425,7 +439,7 @@ describe('createPtyBridge', () => {
   });
 
   it('cleans up PTY on dispose', () => {
-    const bridge = createPtyBridge(mockWindow, mockPty);
+    const bridge = createPtyBridge(mockWindow, mockPty, 'sid');
 
     bridge.dispose();
 
@@ -439,14 +453,12 @@ describe('createPtyBridge', () => {
       return { dispose: vi.fn() };
     });
 
-    createPtyBridge(mockWindow, mockPty);
+    createPtyBridge(mockWindow, mockPty, 'sid');
 
     // Mark window as destroyed
     (mockWindow.isDestroyed as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
-    if (dataCallback) {
-      dataCallback('should not be sent');
-    }
+    callDataCb(dataCallback, 'should not be sent');
 
     expect(mockWindow.webContents.send).not.toHaveBeenCalled();
   });
@@ -456,53 +468,68 @@ describe('createPtyBridge', () => {
 // setupAllHandlers
 // ---------------------------------------------------------------------------
 
+function createMockSessionManagerRef() {
+  const mockSm = {
+    createSession: vi.fn(() => ({
+      sessionId: 'test-session',
+      pty: { pid: 12345 },
+      shell: '/bin/zsh',
+      cwd: '/',
+    })),
+    destroySession: vi.fn(() => true),
+    writeToSession: vi.fn(),
+    resizeSession: vi.fn(),
+    getSession: vi.fn(() => ({
+      cwd: '/tmp',
+      pty: { pid: 1 },
+    })),
+    destroyAll: vi.fn(),
+  };
+  return { current: mockSm as never };
+}
+
 describe('setupAllHandlers', () => {
   it('registers all required IPC channels', () => {
     const mockIpc = createMockIpcMainHandle();
     const mockWindow = createMockWindow();
-    const mockPty = createMockPty();
     const mockClient = createMockAIClient();
+    const sessionRef = createMockSessionManagerRef();
 
     setupAllHandlers(
       mockIpc as unknown as typeof Electron.ipcMain,
       mockWindow,
-      mockPty,
+      sessionRef,
       mockClient,
     );
 
     const registeredChannels = [...mockIpc.handlers.keys()];
 
-    expect(registeredChannels).toContain('execute-command');
     expect(registeredChannels).toContain('ai-query');
+    expect(registeredChannels).toContain('ai-query-stream');
     expect(registeredChannels).toContain('get-themes');
     expect(registeredChannels).toContain('set-theme');
     expect(registeredChannels).toContain('get-theme-config');
-    expect(registeredChannels).toContain('write-to-pty');
-    expect(registeredChannels).toContain('resize-pty');
+    expect(registeredChannels).toContain('create-terminal-session');
+    expect(registeredChannels).toContain('write-to-session');
+    expect(registeredChannels).toContain('resize-session');
   });
 
-  it('execute-command handler is callable', async () => {
+  it('create-terminal-session handler is callable', async () => {
     const mockIpc = createMockIpcMainHandle();
     const mockWindow = createMockWindow();
-    const mockPty = createMockPty();
     const mockClient = createMockAIClient();
-
-    // Set up PTY to resolve immediately
-    let exitCallback: ((exitResult: { exitCode: number }) => void) | null = null;
-    mockPty.onData.mockReturnValue({ dispose: vi.fn() });
-    mockPty.onExit.mockImplementation((cb: (exitResult: { exitCode: number }) => void) => {
-      exitCallback = cb;
-      return { dispose: vi.fn() };
-    });
+    const sessionRef = createMockSessionManagerRef();
 
     setupAllHandlers(
       mockIpc as unknown as typeof Electron.ipcMain,
       mockWindow,
-      mockPty,
+      sessionRef,
       mockClient,
     );
 
-    const executeHandler = mockIpc.getHandler('execute-command');
-    expect(executeHandler).toBeDefined();
+    const handler = mockIpc.getHandler('create-terminal-session');
+    expect(handler).toBeDefined();
+    const result = await (handler as (e: unknown, o: object) => Promise<unknown>)({}, {});
+    expect(result).toMatchObject({ success: true, sessionId: 'test-session' });
   });
 });

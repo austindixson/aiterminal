@@ -92,6 +92,38 @@ vi.mock('@/shell/shell-service', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock terminal tabs — real hook needs electron createTerminalSession
+// ---------------------------------------------------------------------------
+
+vi.mock('@/renderer/hooks/useTerminalTabs', () => ({
+  useTerminalTabs: () => ({
+    state: {
+      tabs: [
+        {
+          id: 'tab-test-1',
+          sessionId: 'session-test-1',
+          name: 'zsh',
+          shell: '/bin/zsh',
+          cwd: '/',
+          createdAt: Date.now(),
+          isActive: true,
+        },
+      ],
+      activeTabId: 'tab-test-1',
+      activeSessionId: 'session-test-1',
+      sessions: new Map(),
+    },
+    createTab: vi.fn(),
+    closeTab: vi.fn(),
+    switchTab: vi.fn(),
+    setActiveTabName: vi.fn(),
+    writeToActive: vi.fn(),
+    resizeActive: vi.fn(),
+    getActiveSessionId: vi.fn(() => 'session-test-1'),
+  }),
+}))
+
+// ---------------------------------------------------------------------------
 // Mock electronAPI on window
 // ---------------------------------------------------------------------------
 
@@ -108,6 +140,11 @@ Object.defineProperty(window, 'electronAPI', {
       model: 'test-model',
       tokens: 10,
       latency: 100,
+    }),
+    getActiveAiModel: vi.fn().mockResolvedValue({
+      id: 'test/model',
+      displayName: 'Test Model',
+      presetName: 'balanced',
     }),
     getThemes: vi.fn().mockResolvedValue([]),
     setTheme: vi.fn().mockResolvedValue(undefined),

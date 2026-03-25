@@ -6,16 +6,17 @@
  * All state updates are immutable.
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+import { MODELS } from '@/ai/models'
 import type { ChatMessage, ChatState, FileAttachment } from '@/types/chat'
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEFAULT_WIDTH = 380
+const DEFAULT_WIDTH = 420
 const MIN_WIDTH = 280
-const MAX_WIDTH = 600
+const MAX_WIDTH = 640
 const MAX_MESSAGES = 50
 
 // ---------------------------------------------------------------------------
@@ -66,13 +67,7 @@ function clampWidth(width: number): number {
 const MENTION_REGEX = /@([\w./-]+)/g
 
 function extractMentionsFromText(text: string): readonly string[] {
-  const matches: string[] = []
-  let match: RegExpExecArray | null = null
-  const regex = new RegExp(MENTION_REGEX.source, MENTION_REGEX.flags)
-  while ((match = regex.exec(text)) !== null) {
-    matches.push(match[1])
-  }
-  return matches
+  return Array.from(text.matchAll(MENTION_REGEX)).map((m) => m[1])
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +100,24 @@ export function useChat(): UseChatReturn {
   const [inputValue, setInputValueState] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [attachedFiles, setAttachedFiles] = useState<ReadonlyArray<FileAttachment>>([])
+  const [activeModelLabel, setActiveModelLabel] = useState<string | undefined>(undefined)
+  const [activeModelId, setActiveModelId] = useState<string | undefined>(undefined)
+  const [activePresetLabel, setActivePresetLabel] = useState<string | undefined>(undefined)
+
+  const refreshActiveAiModel = useCallback(async () => {
+    const api = window.electronAPI
+    if (!api?.getActiveAiModel) return
+    try {
+      const info = await api.getActiveAiModel('general')
+      if (info.displayName) {
+        setActiveModelLabel(info.displayName)
+        setActiveModelId(info.id || undefined)
+        setActivePresetLabel(info.presetName || undefined)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   // -------------------------------------------------------------------------
   // Sidebar controls
@@ -112,15 +125,20 @@ export function useChat(): UseChatReturn {
 
   const open = useCallback(() => {
     setIsOpen(true)
-  }, [])
+    void refreshActiveAiModel()
+  }, [refreshActiveAiModel])
 
   const close = useCallback(() => {
     setIsOpen(false)
   }, [])
 
   const toggle = useCallback(() => {
-    setIsOpen((prev) => !prev)
-  }, [])
+    setIsOpen((prev) => {
+      const next = !prev
+      if (next) void refreshActiveAiModel()
+      return next
+    })
+  }, [refreshActiveAiModel])
 
   const setWidth = useCallback((w: number) => {
     setWidthState(clampWidth(w))
@@ -179,44 +197,96 @@ export function useChat(): UseChatReturn {
       setIsStreaming(true)
 
       try {
+        const api = window.electronAPI
         const hasElectronAPI =
-          typeof window !== 'undefined' &&
-          'electronAPI' in window &&
-          window.electronAPI?.aiQuery
+          typeof window !== 'undefined' && 'electronAPI' in window && api?.aiQuery
 
         if (hasElectronAPI) {
-          // Build conversation context from recent messages
           const context = messages.slice(-10).map((msg) => ({
             role: msg.role as 'user' | 'assistant',
             content: msg.content,
           }))
 
-          const response = await window.electronAPI.aiQuery({
-            prompt: fullPrompt,
-            taskType: 'general',
-            context,
-          })
-
-          let content = response.content ?? ''
-          const model = response.model ?? ''
-
-          // Parse [RUN]command[/RUN] tags — auto-execute (with safety check)
-          const runMatch = content.match(/\[RUN\](.*?)\[\/RUN\]/s)
-          if (runMatch) {
-            const command = runMatch[1].trim()
-            const DESTRUCTIVE = /\b(rm\s|rmdir|kill\s|pkill|killall|drop\s|truncate|format|sudo\s|chmod\s777|>\s*\/|dd\s)/i
-            if (DESTRUCTIVE.test(command)) {
-              content = content.replace(/\[RUN\].*?\[\/RUN\]/s, '').trim()
-              content = `Blocked dangerous command: \`${command}\`\n\nRun it manually if intended.\n\n${content}`
-            } else {
-              window.electronAPI.writeToPty(command + '\r')
-              content = content.replace(/\[RUN\].*?\[\/RUN\]/s, '').trim()
-              content = content ? `Ran \`${command}\`\n\n${content}` : `Ran \`${command}\``
+          const applyRunTags = (raw: string): string => {
+            let text = raw
+            const runMatch = text.match(/\[RUN\](.*?)\[\/RUN\]/s)
+            if (runMatch) {
+              const command = runMatch[1].trim()
+              // SECURITY: Never auto-execute commands. Show for user approval only.
+              // This prevents prompt injection from executing arbitrary code.
+              text = text.replace(/\[RUN\].*?\[\/RUN\]/s, '').trim()
+              text = text
+                ? `💡 Suggested command:\n\`\`\`\n${command}\n\`\`\`\nCopy & run manually if intended.\n\n${text}`
+                : `💡 Suggested command:\n\`\`\`\n${command}\n\`\`\`\nCopy & run manually if intended.`
             }
+            return text
           }
 
-          const assistantMsg = createAssistantMessage(content, model)
-          setMessages((prev) => [...prev, assistantMsg].slice(-MAX_MESSAGES))
+          if (api.aiQueryStream) {
+            const placeholderId = generateMessageId()
+            setMessages((prev) =>
+              [
+                ...prev,
+                {
+                  id: placeholderId,
+                  role: 'assistant' as const,
+                  content: '',
+                  timestamp: Date.now(),
+                },
+              ].slice(-MAX_MESSAGES),
+            )
+
+            let accumulated = ''
+            await api.aiQueryStream(
+              { prompt: fullPrompt, taskType: 'general', context },
+              (payload) => {
+                if (payload.chunk) {
+                  accumulated += payload.chunk
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === placeholderId ? { ...m, content: accumulated } : m,
+                    ),
+                  )
+                }
+                if (payload.error) {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === placeholderId
+                        ? { ...m, content: `Error: ${payload.error}` }
+                        : m,
+                    ),
+                  )
+                }
+                if (payload.done && payload.modelLabel) {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === placeholderId ? { ...m, model: payload.modelLabel } : m,
+                    ),
+                  )
+                }
+              },
+            )
+
+            const finalContent = applyRunTags(accumulated)
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === placeholderId ? { ...m, content: finalContent } : m,
+              ),
+            )
+          } else {
+            const response = await api.aiQuery({
+              prompt: fullPrompt,
+              taskType: 'general',
+              context,
+            })
+
+            const content = applyRunTags(response.content ?? '')
+            const mid = response.model ?? ''
+            const model =
+              mid.length > 0 ? (MODELS.get(mid)?.name ?? mid) : ''
+            const assistantMsg = createAssistantMessage(content, model)
+            setMessages((prev) => [...prev, assistantMsg].slice(-MAX_MESSAGES))
+          }
         }
       } catch {
         const errorMsg = createAssistantMessage(
@@ -250,8 +320,21 @@ export function useChat(): UseChatReturn {
       inputValue,
       isStreaming,
       attachedFiles,
+      activeModelLabel,
+      activeModelId,
+      activePresetLabel,
     }),
-    [isOpen, width, messages, inputValue, isStreaming, attachedFiles],
+    [
+      isOpen,
+      width,
+      messages,
+      inputValue,
+      isStreaming,
+      attachedFiles,
+      activeModelLabel,
+      activeModelId,
+      activePresetLabel,
+    ],
   )
 
   // -------------------------------------------------------------------------
@@ -262,11 +345,32 @@ export function useChat(): UseChatReturn {
   const injectFromTerminal = useCallback(
     async (userInput: string) => {
       if (isStreaming) return // prevent concurrent AI calls
-      setIsOpen(true)  // auto-open sidebar
+      setIsOpen(true) // auto-open sidebar
+      void refreshActiveAiModel()
       await sendMessage(userInput)
     },
-    [sendMessage, isStreaming],
+    [sendMessage, isStreaming, refreshActiveAiModel],
   )
+
+  useEffect(() => {
+    void refreshActiveAiModel()
+    // Run once on mount to initialize AI model
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // lossless-recall: mirror chat into SQLite when AITERMINAL_LOSSLESS_ROOT is set
+  useEffect(() => {
+    const api = window.electronAPI
+    if (!api?.losslessSync) return
+    const roleMsgs = messages.filter(
+      (m) => m.role === 'user' || m.role === 'assistant',
+    )
+    if (roleMsgs.length === 0) return
+    void api.losslessSync({
+      sessionId: 'aiterminal-chat',
+      messages: roleMsgs.map((m) => ({ role: m.role, content: m.content })),
+    })
+  }, [messages])
 
   return {
     state,

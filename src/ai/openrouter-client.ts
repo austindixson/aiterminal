@@ -163,6 +163,10 @@ export class OpenRouterClient implements IAIClient {
     this.activePresetName = presetName;
   }
 
+  getActivePresetName(): string {
+    return this.activePresetName;
+  }
+
   // -------------------------------------------------------------------------
   // IAIClient — query
   // -------------------------------------------------------------------------

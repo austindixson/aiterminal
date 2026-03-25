@@ -1,3 +1,13 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/hooks/useTheme.ts
+ * Module: renderer/hooks
+ * Purpose: React hook for theme management with opacity and blur overrides
+ * Dependencies: react, @/themes/types, @/themes/theme-manager
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/components/ThemeSelector.tsx, /Users/ghost/Desktop/aiterminal/src/themes/theme-manager.ts
+ * Keywords: theme, theme-manager, opacity, blur, css-custom-properties
+ * Last Updated: 2026-03-24
+ */
+
 import { useState, useCallback, useEffect, useMemo } from 'react'
 
 import type { Theme } from '@/themes/types'

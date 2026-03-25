@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 
 import {
   isNaturalLanguage,
+  isTuiCliInvocation,
+  shouldAutoEnableTuiFromPtyOutput,
   parseCommandResult,
   shouldTriggerAI,
   buildAIPrompt,
@@ -26,6 +28,12 @@ describe('isNaturalLanguage', () => {
       ['what does this command do?'],
       ['tell me about kubernetes'],
       ['is node faster than python?'],
+      ['hello'],
+      ['hi'],
+      ['hey there'],
+      ['good morning'],
+      ['thanks'],
+      ['bye'],
     ])('"%s" -> true', (input) => {
       expect(isNaturalLanguage(input)).toBe(true);
     });
@@ -48,6 +56,7 @@ describe('isNaturalLanguage', () => {
       ['sudo apt-get update'],
       ['HOME=/tmp echo test'],
       ['./run.sh'],
+      ['echo hello'],
     ])('"%s" -> false', (input) => {
       expect(isNaturalLanguage(input)).toBe(false);
     });
@@ -61,6 +70,65 @@ describe('isNaturalLanguage', () => {
     it('whitespace only -> false', () => {
       expect(isNaturalLanguage('   ')).toBe(false);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isTuiCliInvocation
+// ---------------------------------------------------------------------------
+
+describe('isTuiCliInvocation', () => {
+  it.each([
+    ['claude'],
+    ['claude '],
+    ['  claude  '],
+    ['claude --help'],
+    ['claude /some/project'],
+    ['CLAUDE'],
+  ])('"%s" -> true', (input) => {
+    expect(isTuiCliInvocation(input)).toBe(true);
+  });
+
+  it.each([
+    [''],
+    ['   '],
+    ['claudecode'],
+    ['pre claude'],
+    ['echo claude'],
+  ])('"%s" -> false', (input) => {
+    expect(isTuiCliInvocation(input)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// shouldAutoEnableTuiFromPtyOutput
+// ---------------------------------------------------------------------------
+
+describe('shouldAutoEnableTuiFromPtyOutput', () => {
+  it('detects alternate-screen sequence', () => {
+    expect(shouldAutoEnableTuiFromPtyOutput('\x1b[?1049h')).toBe(true);
+  });
+
+  it('detects Claude Code banner text', () => {
+    expect(shouldAutoEnableTuiFromPtyOutput('Welcome to Claude Code')).toBe(true);
+  });
+
+  it('detects Welcome back + Claude', () => {
+    expect(
+      shouldAutoEnableTuiFromPtyOutput('Welcome back Austin!\n… Claude …'),
+    ).toBe(true);
+  });
+
+  it('detects Sonnet + effort line', () => {
+    expect(
+      shouldAutoEnableTuiFromPtyOutput('Sonnet 4.6 with high effort'),
+    ).toBe(true);
+  });
+
+  it('returns false for unrelated shell noise', () => {
+    expect(shouldAutoEnableTuiFromPtyOutput('ls: foo: No such file')).toBe(
+      false,
+    );
   });
 });
 

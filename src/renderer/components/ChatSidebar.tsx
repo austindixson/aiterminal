@@ -45,6 +45,21 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const CHAT_INPUT_MIN_PX = 88
+  const CHAT_INPUT_MAX_PX = 260
+
+  const adjustTextareaHeight = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = '0px'
+    const h = Math.min(
+      Math.max(el.scrollHeight, CHAT_INPUT_MIN_PX),
+      CHAT_INPUT_MAX_PX,
+    )
+    el.style.height = `${h}px`
+  }, [])
 
   // -------------------------------------------------------------------------
   // Auto-scroll to bottom on new messages
@@ -58,6 +73,10 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [state.messages.length])
+
+  useEffect(() => {
+    adjustTextareaHeight()
+  }, [state.inputValue, adjustTextareaHeight])
 
   // -------------------------------------------------------------------------
   // Keyboard handling
@@ -126,7 +145,21 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
 
       {/* Header */}
       <div className="chat-header">
-        <h2 className="chat-header__title">AI Chat</h2>
+        <div className="chat-header__heading">
+          <h2 className="chat-header__title">AI Chat</h2>
+          {(state.activeModelLabel || state.activePresetLabel) && (
+            <p
+              className="chat-header__subtitle"
+              title={
+                state.activeModelId
+                  ? `${state.activeModelId}${state.activePresetLabel ? ` · preset: ${state.activePresetLabel}` : ''}`
+                  : undefined
+              }
+            >
+              {[state.activePresetLabel, state.activeModelLabel].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
         <div className="chat-header__controls">
           <button
             type="button"
@@ -193,14 +226,16 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
         )}
 
         {/* Textarea */}
-        <div className="chat-input-row">
+        <div className="chat-composer">
           <textarea
+            ref={textareaRef}
             className="chat-textarea"
-            placeholder="Type a message... (@file to attach)"
+            placeholder="Ask anything… (@file to attach)"
             value={state.inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             rows={1}
+            spellCheck
           />
           <button
             type="button"

@@ -31,6 +31,12 @@ export interface ChatState {
   readonly inputValue: string
   readonly isStreaming: boolean
   readonly attachedFiles: ReadonlyArray<FileAttachment>
+  /** Human-readable model used for chat (`general` task), when known. */
+  readonly activeModelLabel?: string
+  /** OpenRouter model id for chat. */
+  readonly activeModelId?: string
+  /** Router preset (balanced / performance / budget). */
+  readonly activePresetLabel?: string
 }
 
 export interface ChatConversation {

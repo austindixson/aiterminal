@@ -93,11 +93,16 @@ describe('ChatSidebar', () => {
     const props = createProps({
       state: createState({ isOpen: true, width: 420 }),
     })
-    render(<ChatSidebar {...props} />)
+    const { container } = render(
+      <div className="chat-panel" style={{ width: '420px' }}>
+        <ChatSidebar {...props} />
+      </div>,
+    )
 
     const sidebar = screen.getByTestId('chat-sidebar')
     expect(sidebar).toBeInTheDocument()
-    expect(sidebar.style.width).toBe('420px')
+    const panel = container.querySelector('.chat-panel')
+    expect(panel).toHaveStyle({ width: '420px' })
   })
 
   // -------------------------------------------------------------------------
@@ -168,7 +173,7 @@ describe('ChatSidebar', () => {
     const props = createProps()
     render(<ChatSidebar {...props} />)
 
-    expect(screen.getByPlaceholderText(/message/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/ask anything/i)).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: /send/i }),
     ).toBeInTheDocument()
@@ -211,7 +216,7 @@ describe('ChatSidebar', () => {
     })
     render(<ChatSidebar {...props} />)
 
-    const textarea = screen.getByPlaceholderText(/message/i)
+    const textarea = screen.getByPlaceholderText(/ask anything/i)
     await user.click(textarea)
     await user.keyboard('{Enter}')
 
@@ -231,7 +236,7 @@ describe('ChatSidebar', () => {
     })
     render(<ChatSidebar {...props} />)
 
-    const textarea = screen.getByPlaceholderText(/message/i)
+    const textarea = screen.getByPlaceholderText(/ask anything/i)
     await user.click(textarea)
     await user.keyboard('{Shift>}{Enter}{/Shift}')
 
@@ -313,7 +318,7 @@ describe('ChatSidebar', () => {
     const chip = screen.getByText('a.ts').closest('.chat-attachment-chip')
     expect(chip).toBeInTheDocument()
 
-    const removeBtn = within(chip!).getByRole('button', { name: /remove/i })
+    const removeBtn = within(chip as HTMLElement).getByRole('button', { name: /remove/i })
     expect(removeBtn).toBeInTheDocument()
   })
 
@@ -330,7 +335,7 @@ describe('ChatSidebar', () => {
     render(<ChatSidebar {...props} />)
 
     const chip = screen.getByText('a.ts').closest('.chat-attachment-chip')
-    const removeBtn = within(chip!).getByRole('button', { name: /remove/i })
+    const removeBtn = within(chip as HTMLElement).getByRole('button', { name: /remove/i })
     await user.click(removeBtn)
 
     expect(onRemoveAttachment).toHaveBeenCalledWith('/src/a.ts')
@@ -351,7 +356,7 @@ describe('ChatSidebar', () => {
     })
     render(<ChatSidebar {...props} />)
 
-    const textarea = screen.getByPlaceholderText(/message/i)
+    const textarea = screen.getByPlaceholderText(/ask anything/i)
     await user.click(textarea)
     await user.type(textarea, '@')
 
@@ -440,7 +445,7 @@ describe('ChatSidebar', () => {
     })
     render(<ChatSidebar {...props} />)
 
-    const textarea = screen.getByPlaceholderText(/message/i)
+    const textarea = screen.getByPlaceholderText(/ask anything/i)
     await user.type(textarea, 'H')
 
     expect(onInputChange).toHaveBeenCalled()

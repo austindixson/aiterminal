@@ -1,3 +1,13 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/components/ThemeSelector.tsx
+ * Module: renderer/components
+ * Purpose: Theme picker dropdown with color swatches, opacity, and blur controls
+ * Dependencies: react, @/themes/types, @/renderer/hooks/useTheme
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/hooks/useTheme.ts, /Users/ghost/Desktop/aiterminal/src/themes/theme-manager.ts
+ * Keywords: theme-selector, dropdown, color-swatch, opacity, blur, theme-picker
+ * Last Updated: 2026-03-24
+ */
+
 import { useState, useCallback } from 'react'
 import type { FC } from 'react'
 import type { Theme } from '@/themes/types'

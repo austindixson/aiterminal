@@ -1,22 +1,10 @@
 /* ===== File Tree Panel ===== */
 
 .file-tree-panel {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 250px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-right: 1px solid var(--glass-border);
-  border-radius: 0 12px 12px 0;
-  box-shadow:
-    8px 0 32px rgba(0, 0, 0, 0.3),
-    inset -1px 0 0 rgba(255, 255, 255, 0.04);
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  z-index: 10;
   font-size: 13px;
   color: var(--terminal-fg);
   -webkit-app-region: no-drag;

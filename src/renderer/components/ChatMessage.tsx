@@ -59,6 +59,8 @@ export const ChatMessageBubble: FC<ChatMessageBubbleProps> = ({ message }) => {
       <div className="chat-message__content">
         {isAssistant ? (
           <ReactMarkdown
+            disallowedElements={['p']}
+            unwrapDisallowed
             components={{
               code({ inline, className, children, ...props }: any) {
                 if (inline) {

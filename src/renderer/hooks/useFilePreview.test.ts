@@ -10,8 +10,9 @@ const mockReadFile = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(window as Record<string, unknown>).electronAPI = {
-    ...(window as Record<string, unknown>).electronAPI as object,
+  const w = window as unknown as Record<string, unknown>
+  w.electronAPI = {
+    ...(w.electronAPI as object),
     readFile: mockReadFile,
   }
 })
