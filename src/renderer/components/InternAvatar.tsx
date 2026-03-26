@@ -293,24 +293,25 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 // Get latest cursor position from ref (not state, to avoid closure issues)
                 const currentCursor = cursorPositionRef.current;
 
-                // Get window dimensions for full-screen cursor tracking
-                const windowCenterX = window.innerWidth / 2;
-                const windowCenterY = window.innerHeight / 2;
+                // Get avatar canvas position on screen to calculate relative center
+                const rect = container.getBoundingClientRect();
+                const canvasCenterX = rect.left + rect.width / 2;
+                const canvasCenterY = rect.top + rect.height / 2;
 
-                // Calculate cursor position relative to center of entire window
-                const deltaX = currentCursor.x - windowCenterX;
-                const deltaY = currentCursor.y - windowCenterY;
+                // Calculate cursor position relative to avatar canvas center
+                const deltaX = currentCursor.x - canvasCenterX;
+                const deltaY = currentCursor.y - canvasCenterY;
 
                 // Calculate head rotation to look at cursor
-                // NOTE: Avatar scene is rotated 180° on Y, so directions are flipped!
                 const maxYaw = 0.6; // ~35 degrees left/right
                 const maxPitch = 0.25; // ~15 degrees up/down
 
-                // Calculate normalized direction (-1 to 1) based on window position
-                const normalizedX = deltaX / (window.innerWidth / 2);
-                const normalizedY = deltaY / (window.innerHeight / 2);
+                // Normalize based on canvas size for proportional tracking
+                const maxDistance = Math.max(rect.width, rect.height);
+                const normalizedX = Math.max(-1, Math.min(1, deltaX / (maxDistance / 2)));
+                const normalizedY = Math.max(-1, Math.min(1, deltaY / (maxDistance / 2)));
 
-                // Calculate target rotations (no negation needed - 180° scene rotation handled internally)
+                // Calculate target rotations
                 const targetYaw = normalizedX * maxYaw;
                 const targetPitch = -normalizedY * maxPitch;
 
@@ -674,24 +675,25 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 // Get latest cursor position from ref (not state, to avoid closure issues)
                 const currentCursor = cursorPositionRef.current;
 
-                // Get window dimensions for full-screen cursor tracking
-                const windowCenterX = window.innerWidth / 2;
-                const windowCenterY = window.innerHeight / 2;
+                // Get avatar canvas position on screen to calculate relative center
+                const rect = container.getBoundingClientRect();
+                const canvasCenterX = rect.left + rect.width / 2;
+                const canvasCenterY = rect.top + rect.height / 2;
 
-                // Calculate cursor position relative to center of entire window
-                const deltaX = currentCursor.x - windowCenterX;
-                const deltaY = currentCursor.y - windowCenterY;
+                // Calculate cursor position relative to avatar canvas center
+                const deltaX = currentCursor.x - canvasCenterX;
+                const deltaY = currentCursor.y - canvasCenterY;
 
                 // Calculate head rotation to look at cursor
-                // NOTE: Avatar scene is rotated 180° on Y, so directions are flipped!
                 const maxYaw = 0.6; // ~35 degrees left/right
                 const maxPitch = 0.25; // ~15 degrees up/down
 
-                // Calculate normalized direction (-1 to 1) based on window position
-                const normalizedX = deltaX / (window.innerWidth / 2);
-                const normalizedY = deltaY / (window.innerHeight / 2);
+                // Normalize based on canvas size for proportional tracking
+                const maxDistance = Math.max(rect.width, rect.height);
+                const normalizedX = Math.max(-1, Math.min(1, deltaX / (maxDistance / 2)));
+                const normalizedY = Math.max(-1, Math.min(1, deltaY / (maxDistance / 2)));
 
-                // Calculate target rotations (no negation needed - 180° scene rotation handled internally)
+                // Calculate target rotations
                 const targetYaw = normalizedX * maxYaw;
                 const targetPitch = -normalizedY * maxPitch;
 
