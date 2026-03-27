@@ -262,6 +262,8 @@ export function useChat(): UseChatReturn {
 
             let accumulated = ''
             let sentenceBuffer = '' // Track incomplete sentences
+            let spokenSentences = 0 // Track how many sentences we've spoken
+            const MAX_SPOKEN_SENTENCES = 2 // Only speak first 2 sentences
 
             await api.aiQueryStream(
               { prompt: fullPrompt, taskType: 'general', context },
@@ -273,14 +275,15 @@ export function useChat(): UseChatReturn {
                   // Check if we have complete sentences (ending with . ! ? or newline)
                   const sentences = sentenceBuffer.match(/[^.!?]*[.!?]+/g)
 
-                  if (sentences && sentences.length > 0) {
-                    // Send complete sentences to TTS immediately
+                  if (sentences && sentences.length > 0 && spokenSentences < MAX_SPOKEN_SENTENCES) {
+                    // Send complete sentences to TTS immediately (up to 2 sentences max)
                     sentences.forEach((sentence) => {
                       const trimmed = sentence.trim()
-                      if (trimmed) {
+                      if (trimmed && spokenSentences < MAX_SPOKEN_SENTENCES) {
                         console.log('[useChat] Streaming TTS:', trimmed.substring(0, 50))
                         const speakEvent = new CustomEvent('ai-response', { detail: trimmed })
                         window.dispatchEvent(speakEvent)
+                        spokenSentences++
                       }
                     })
 
@@ -324,18 +327,6 @@ export function useChat(): UseChatReturn {
                 m.id === placeholderId ? { ...m, content: finalContent } : m,
               ),
             )
-
-            // Speak any remaining text in the buffer that wasn't sent during streaming
-            try {
-              const remaining = sentenceBuffer.trim()
-              if (remaining && remaining.length > 0) {
-                console.log('[useChat] Speaking remaining text:', remaining.substring(0, 50))
-                const speakEvent = new CustomEvent('ai-response', { detail: remaining })
-                window.dispatchEvent(speakEvent)
-              }
-            } catch (e) {
-              console.error('[useChat] TTS final chunk error:', e)
-            }
           } else {
             const response = await api.aiQuery({
               prompt: fullPrompt,

@@ -87,6 +87,9 @@ For DESTRUCTIVE commands (rm, kill, drop, etc.), do NOT auto-execute. Instead ex
 
 For questions/explanations that don't need a command, just respond naturally without [RUN] tags.
 
+**VOICE RESPONSES:**
+Your spoken responses (TTS) are limited to 1-2 sentences maximum. Be punchy and direct. For detailed explanations, write them out but keep spoken responses short.
+
 Be extremely concise. 1-2 sentences max unless the user asks for detail.`;
   }
 
@@ -128,6 +131,9 @@ For destructive operations, explain first and wait for user confirmation.
 
 **SPECIALTIES:**
 ${intern.specialties.map(s => `- ${s}`).join('\n')}
+
+**VOICE RESPONSES:**
+Your spoken responses (TTS) are limited to 1-2 sentences maximum. Be punchy and show your personality. For detailed explanations, write them out but keep spoken responses short.
 
 Be concise, confident, and helpful. Get things done efficiently.`;
 }
