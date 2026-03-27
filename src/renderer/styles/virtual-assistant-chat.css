@@ -1,0 +1,267 @@
+/*
+ * Virtual Assistant Chat Overlay Styles
+ * Transparent chat overlay for VRM sidebar
+ */
+
+.virtual-assistant-chat {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  pointer-events: none; /* Let clicks pass through to VRM model */
+  z-index: 10; /* Above speech bubbles */
+}
+
+.virtual-assistant-chat__messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  padding-top: 48%; /* Start below the midpoint (where her face is) */
+  padding-bottom: 80px; /* Space for input at bottom */
+  pointer-events: auto; /* Enable scrolling */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scroll-behavior: smooth;
+  /* Anchor messages to bottom (like text messaging) */
+  justify-content: flex-end;
+  /* Gradual transparency gradient: 100% opacity at bottom → 0% at top */
+  mask-image: linear-gradient(to top,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.95) 15%,
+    rgba(0, 0, 0, 0.85) 30%,
+    rgba(0, 0, 0, 0.7) 45%,
+    rgba(0, 0, 0, 0.5) 60%,
+    rgba(0, 0, 0, 0.3) 75%,
+    rgba(0, 0, 0, 0.15) 85%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  -webkit-mask-image: linear-gradient(to top,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, 0.95) 15%,
+    rgba(0, 0, 0, 0.85) 30%,
+    rgba(0, 0, 0, 0.7) 45%,
+    rgba(0, 0, 0, 0.5) 60%,
+    rgba(0, 0, 0, 0.3) 75%,
+    rgba(0, 0, 0, 0.15) 85%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+/* Custom scrollbar - sleek and minimal */
+.virtual-assistant-chat__messages::-webkit-scrollbar {
+  width: 4px;
+}
+
+.virtual-assistant-chat__messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.virtual-assistant-chat__messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.virtual-assistant-chat__messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Empty state */
+.virtual-assistant-chat__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  padding: 20px;
+  pointer-events: none;
+}
+
+.virtual-assistant-chat__empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.virtual-assistant-chat__empty-text {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+/* Messages */
+.virtual-assistant-chat__message {
+  display: flex;
+  width: 100%;
+  animation: message-slide-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes message-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.virtual-assistant-chat__message--user {
+  justify-content: flex-end;
+}
+
+.virtual-assistant-chat__message--assistant {
+  justify-content: flex-start;
+}
+
+.virtual-assistant-chat__message-bubble {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15),
+              0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.virtual-assistant-chat__message--user .virtual-assistant-chat__message-bubble {
+  background: rgba(99, 102, 241, 0.9);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.virtual-assistant-chat__message--assistant .virtual-assistant-chat__message-bubble {
+  background: rgba(20, 20, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.virtual-assistant-chat__message-content {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #ffffff;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.virtual-assistant-chat__message-content--streaming {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.streaming-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.streaming-dots::before,
+.streaming-dots::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+  animation: dot-bounce 1.4s infinite ease-in-out;
+}
+
+.streaming-dots::after {
+  animation-delay: 0.2s;
+}
+
+@keyframes dot-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+.virtual-assistant-chat__message-time {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 6px;
+}
+
+/* Input area */
+.virtual-assistant-chat__input {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: auto;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.virtual-assistant-chat__input-field {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #ffffff;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.virtual-assistant-chat__input-field::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.virtual-assistant-chat__input-field:focus {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.virtual-assistant-chat__input-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.virtual-assistant-chat__input-send {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.9);
+  border: none;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
+}
+
+.virtual-assistant-chat__input-send:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 1);
+  transform: scale(1.08);
+}
+
+.virtual-assistant-chat__input-send:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.virtual-assistant-chat__input-send:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.virtual-assistant-chat__input-send svg {
+  width: 18px;
+  height: 18px;
+}

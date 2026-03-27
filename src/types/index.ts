@@ -1,4 +1,5 @@
 import type { FileEntry } from './file-tree'
+export type { FileTab, EditorColumn, ColumnsState, PersistedLayout } from './editor-columns'
 
 /** Terminal color theme definition */
 export interface Theme {
@@ -184,6 +185,7 @@ export interface ElectronAPI {
 
   // --- Legacy PTY bridge (deprecated, for backward compatibility) ---
   onPtyData: (callback: (data: string) => void) => () => void;
+  onAnySessionData: (callback: (sessionId: string, data: string) => void) => () => void;
   writeToPty: (data: string) => void;
   resizePty: (cols: number, rows: number) => void;
 
@@ -315,11 +317,55 @@ export interface ElectronAPI {
     message?: string;
     error?: string;
   }>;
+
+  // --- Claude Code CLI TUI capture ---
+  startTuiCapture: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+  stopTuiCapture: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+  getTuiContent: (sessionId: string) => Promise<{ content: string; timestamp: number }>;
+  onTuiContentUpdated: (callback: (data: { sessionId: string; content: string; timestamp: number }) => void) => () => void;
+
+  // --- Claude Code CLI service ---
+  claudeCodeSpawn: (args?: string[]) => Promise<boolean>;
+  claudeCodeWrite: (input: string) => Promise<void>;
+  claudeCodeKill: () => Promise<void>;
+  claudeCodeIsRunning: () => Promise<boolean>;
+  onClaudeCodeOutput: (callback: (data: string) => void) => () => void;
+  onClaudeCodeError: (callback: (error: string) => void) => () => void;
+  onClaudeCodeClose: (callback: (code: number) => void) => () => void;
+
+  // --- Claude Code log reading ---
+  getClaudeCodeLog: (limit?: number) => Promise<{
+    success: boolean;
+    messages?: ClaudeCodeMessage[];
+    error?: string;
+  }>;
+  startClaudeCodeLogWatcher: () => Promise<{ success: boolean; error?: string }>;
+  stopClaudeCodeLogWatcher: () => Promise<{ success: boolean }>;
+  onClaudeCodeLogUpdated: (callback: (data: { messages: ClaudeCodeMessage[]; timestamp: number }) => void) => () => void;
+}
+
+/** Claude Code session message from JSONL log */
+export interface ClaudeCodeMessage {
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  timestamp?: number;
+  tools?: Array<{
+    name: string;
+    input?: Record<string, unknown>;
+    output?: string;
+    error?: string;
+  }>;
+}
+
+/** Environment variables exposed from main process */
+export interface EnvVars {
+  VITE_ELEVENLABS_API_KEY: string;
 }
 
 /** Augment the Window interface for preload */
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
+    env: EnvVars;
   }
 }

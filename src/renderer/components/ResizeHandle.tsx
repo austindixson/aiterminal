@@ -122,11 +122,11 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
       onTouchStart={handleTouchStart}
       style={{
         position: 'relative',
-        zIndex: 10,
+        zIndex: 100,
         cursor: isHorizontal ? 'col-resize' : 'row-resize',
-        // Larger hit area for easier grabbing
-        width: isHorizontal ? '12px' : '100%',
-        height: isHorizontal ? '100%' : '12px',
+        // Larger hit area for easier grabbing (increased from 12px to 16px)
+        width: isHorizontal ? '16px' : '100%',
+        height: isHorizontal ? '100%' : '16px',
         // Don't grow or shrink in flex layout
         flex: '0 0 auto',
         // Visual indicator (thin line)
@@ -135,9 +135,10 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
         background: isDragging
           ? 'rgba(189, 147, 249, 0.5)'
           : isHorizontal
-            ? 'linear-gradient(to right, transparent 4px, rgba(255, 255, 255, 0.1) 4px, rgba(255, 255, 255, 0.1) 8px, transparent 8px)'
-            : 'linear-gradient(to bottom, transparent 4px, rgba(255, 255, 255, 0.1) 4px, rgba(255, 255, 255, 0.1) 8px, transparent 8px)',
+            ? 'linear-gradient(to right, transparent 6px, rgba(255, 255, 255, 0.15) 6px, rgba(255, 255, 255, 0.15) 10px, transparent 10px)'
+            : 'linear-gradient(to bottom, transparent 6px, rgba(255, 255, 255, 0.15) 6px, rgba(255, 255, 255, 0.15) 10px, transparent 10px)',
         transition: isDragging ? 'none' : 'background-color 0.15s ease',
+        pointerEvents: 'auto',
       }}
     />
   );

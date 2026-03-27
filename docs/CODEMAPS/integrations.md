@@ -1,6 +1,6 @@
 # Integrations Codemap
 
-**Last Updated:** 2026-03-24
+**Last Updated:** 2026-03-25
 **Area:** Ecosystem Bridges
 **Total Files:** 5 core files
 **Total Lines:** ~177

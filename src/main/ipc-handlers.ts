@@ -17,6 +17,7 @@
  */
 
 import type { IpcMain, BrowserWindow } from 'electron';
+import type { FSWatcher } from 'node:fs';
 import type { IAIClient } from '../ai/client';
 import type { AIRequest, AIResponse, ContextMessage, TaskType } from '../ai/types';
 import type { CommandResult } from '../types/index';
@@ -25,7 +26,9 @@ import type { TerminalSessionManager } from './terminal-session-manager.js';
 import { ThemeManager, serializeThemeConfig } from '../themes/theme-manager';
 import { readDirectory, readDirectoryTree } from '../file-tree/file-tree-service';
 import * as fs from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { watch } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
 import {
   validateWorkspacePath,
   MAX_FILE_BYTES,
@@ -34,6 +37,7 @@ import { resolveCwdFromPid } from './cwd-probe.js';
 import { runLosslessCapture } from './lossless-bridge.js';
 import { execDietMcp, execFerroclaw, execSkinnytoolsWrap } from './ecosystem-exec.js';
 import { kokoroTtsService } from './kokoro-service.js';
+import { claudeCodeService } from './claude-code-service.js';
 
 // ---------------------------------------------------------------------------
 // Session manager ref (survives window recreation on macOS activate)
@@ -576,5 +580,297 @@ export function setupAllHandlers(
 
   ipc.handle('kokoro-tts-speak', async (_event, text: string) => {
     return kokoroTtsService.speak(typeof text === 'string' ? text : '');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Claude Code CLI TUI capture
+  // ---------------------------------------------------------------------------
+
+  // Track TUI capture state per session
+  const tuiCaptureSessions = new Map<string, {
+    buffer: string[];
+    isActive: boolean;
+    dataDisposable?: { dispose: () => void };
+  }>();
+
+  ipc.handle('start-tui-capture', async (_event, sessionId: string) => {
+    const sm = getSessionManager();
+    if (!sm) {
+      return { success: false, error: 'No active session manager' };
+    }
+
+    const session = sm.getSession(sessionId);
+    if (!session) {
+      return { success: false, error: 'Session not found' };
+    }
+
+    // Initialize capture state
+    tuiCaptureSessions.set(sessionId, {
+      buffer: [],
+      isActive: true,
+    });
+
+    // Listen to PTY data and capture it
+    const dataDisposable = session.pty.onData((data: string) => {
+      const capture = tuiCaptureSessions.get(sessionId);
+      if (capture?.isActive) {
+        capture.buffer.push(data);
+
+        // Notify renderer of new content (debounced in real implementation)
+        const fullContent = capture.buffer.join('');
+        if (!_window.isDestroyed()) {
+          _window.webContents.send('tui-content-updated', {
+            sessionId,
+            content: fullContent,
+            timestamp: Date.now(),
+          });
+        }
+      }
+    });
+
+    const capture = tuiCaptureSessions.get(sessionId);
+    if (capture) {
+      capture.dataDisposable = dataDisposable;
+    }
+
+    return { success: true };
+  });
+
+  ipc.handle('stop-tui-capture', async (_event, sessionId: string) => {
+    const capture = tuiCaptureSessions.get(sessionId);
+    if (!capture) {
+      return { success: false, error: 'No active capture for session' };
+    }
+
+    // Stop capturing
+    capture.isActive = false;
+    capture.dataDisposable?.dispose();
+
+    // Clear capture state
+    tuiCaptureSessions.delete(sessionId);
+
+    return { success: true };
+  });
+
+  ipc.handle('get-tui-content', async (_event, sessionId: string) => {
+    const capture = tuiCaptureSessions.get(sessionId);
+    if (!capture) {
+      return { content: '', timestamp: 0 };
+    }
+
+    return {
+      content: capture.buffer.join(''),
+      timestamp: Date.now(),
+    };
+  });
+
+  // ---------------------------------------------------------------------------
+  // Claude Code CLI service
+  // ---------------------------------------------------------------------------
+
+  ipc.handle('claude-code-spawn', async (_event, args?: string[]) => {
+    return claudeCodeService.spawn(args);
+  });
+
+  ipc.handle('claude-code-write', (_event, input: string) => {
+    claudeCodeService.write(input);
+  });
+
+  ipc.handle('claude-code-kill', () => {
+    claudeCodeService.kill();
+  });
+
+  ipc.handle('claude-code-is-running', () => {
+    return claudeCodeService.isRunning();
+  });
+
+  // Listen to Claude Code output and forward to renderer
+  claudeCodeService.onOutput((data: string) => {
+    if (!_window.isDestroyed()) {
+      _window.webContents.send('claude-code-output', data);
+    }
+  });
+
+  claudeCodeService.onError((error: string) => {
+    if (!_window.isDestroyed()) {
+      _window.webContents.send('claude-code-error', error);
+    }
+  });
+
+  claudeCodeService.onClose((code: number) => {
+    if (!_window.isDestroyed()) {
+      _window.webContents.send('claude-code-close', code);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Claude Code log reading
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Find Claude Code sessions directory.
+   * Checks both ~/.config/claude-code/sessions and ~/.claude-code/sessions
+   */
+  async function getClaudeCodeSessionsDir(): Promise<string | null> {
+    const possiblePaths = [
+      join(homedir(), '.config', 'claude-code', 'sessions'),
+      join(homedir(), '.claude-code', 'sessions'),
+    ];
+
+    for (const dirPath of possiblePaths) {
+      try {
+        const stat = await fs.stat(dirPath);
+        if (stat.isDirectory()) {
+          return dirPath;
+        }
+      } catch {
+        // Directory doesn't exist, continue to next option
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Read and parse JSONL session file.
+   * Each line is a JSON object representing a message.
+   */
+  async function readSessionFile(filePath: string): Promise<any[]> {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+      const messages: any[] = [];
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          messages.push(msg);
+        } catch {
+          // Skip invalid JSON lines
+          continue;
+        }
+      }
+
+      return messages;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get the most recent session file from the sessions directory.
+   */
+  async function getMostRecentSession(sessionsDir: string): Promise<string | null> {
+    try {
+      const files = await fs.readdir(sessionsDir);
+      const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
+
+      if (jsonlFiles.length === 0) {
+        return null;
+      }
+
+      // Sort by modification time (most recent first)
+      const filesWithStats = await Promise.all(
+        jsonlFiles.map(async (filename) => {
+          const filePath = join(sessionsDir, filename);
+          const stat = await fs.stat(filePath);
+          return { filePath, mtime: stat.mtimeMs };
+        })
+      );
+
+      filesWithStats.sort((a, b) => b.mtime - a.mtime);
+      return filesWithStats[0]?.filePath ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  // File watcher for Claude Code session directory
+  let claudeCodeWatcher: FSWatcher | null = null;
+
+  ipc.handle('get-claude-code-log', async (_event, limit: number = 50) => {
+    try {
+      const sessionsDir = await getClaudeCodeSessionsDir();
+      if (!sessionsDir) {
+        return {
+          success: false,
+          error: 'Claude Code sessions directory not found',
+        };
+      }
+
+      const sessionFile = await getMostRecentSession(sessionsDir);
+      if (!sessionFile) {
+        return {
+          success: false,
+          error: 'No Claude Code sessions found',
+        };
+      }
+
+      const messages = await readSessionFile(sessionFile);
+
+      // Return last N messages
+      const limitedMessages = messages.slice(-limit);
+
+      return {
+        success: true,
+        messages: limitedMessages,
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to read Claude Code log';
+      return {
+        success: false,
+        error: message,
+      };
+    }
+  });
+
+  // Setup file watcher for Claude Code session updates
+  ipc.handle('start-claude-code-log-watcher', async () => {
+    try {
+      const sessionsDir = await getClaudeCodeSessionsDir();
+      if (!sessionsDir) {
+        return { success: false, error: 'Claude Code sessions directory not found' };
+      }
+
+      // Clean up existing watcher
+      if (claudeCodeWatcher) {
+        claudeCodeWatcher.close();
+        claudeCodeWatcher = null;
+      }
+
+      // Watch for changes in the sessions directory
+      claudeCodeWatcher = watch(sessionsDir, async (_eventType: string, filename: string | null) => {
+        if (!filename || !filename.endsWith('.jsonl')) {
+          return;
+        }
+
+        // Read the updated session file
+        const sessionPath = join(sessionsDir, filename);
+        const messages = await readSessionFile(sessionPath);
+
+        // Notify renderer of update
+        if (!_window.isDestroyed()) {
+          _window.webContents.send('claude-code-log-updated', {
+            messages,
+            timestamp: Date.now(),
+          });
+        }
+      });
+
+      return { success: true };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to start watcher';
+      return { success: false, error: message };
+    }
+  });
+
+  ipc.handle('stop-claude-code-log-watcher', async () => {
+    if (claudeCodeWatcher) {
+      claudeCodeWatcher.close();
+      claudeCodeWatcher = null;
+    }
+    return { success: true };
   });
 }

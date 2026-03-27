@@ -1,0 +1,198 @@
+/* ===================================================================
+   cursor-snippet.css — Minimal cursor-focused code display
+   Inspired by Claude Code CLI aesthetic
+   =================================================================== */
+
+/* Base container */
+.cursor-snippet {
+  display: inline-block;
+  min-width: 200px;
+  max-width: 100%;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Droid Sans Mono', 'Source Code Pro', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  background: transparent;
+  border-radius: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Code block */
+.cursor-snippet__code {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: pre;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.cursor-snippet__code code {
+  display: block;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Individual line */
+.cursor-snippet__line {
+  display: flex;
+  align-items: flex-start;
+  min-height: 1.6em;
+  padding: 0;
+  background: transparent;
+  transition: opacity 0.2s ease;
+}
+
+/* Line number (subtle) */
+.cursor-snippet__line-number {
+  display: inline-block;
+  flex-shrink: 0;
+  width: calc(var(--line-number-width, 2) * 1ch + 16px);
+  text-align: right;
+  padding-right: 16px;
+  color: rgba(255, 255, 255, 0.25);
+  user-select: none;
+  font-size: 0.9em;
+  font-weight: 400;
+}
+
+/* Line content */
+.cursor-snippet__line-content {
+  display: inline;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: pre;
+  position: relative;
+}
+
+/* Cursor line styling */
+.cursor-snippet__line--cursor {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 2px;
+}
+
+.cursor-snippet__line--cursor .cursor-snippet__line-content {
+  color: rgba(255, 255, 255, 1);
+  font-weight: 500;
+}
+
+/* Blinking cursor indicator */
+.cursor-snippet__cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--ansi-blue, #bd93f9);
+  font-weight: bold;
+  animation: cursorBlink 1s step-end infinite;
+  user-select: none;
+}
+
+@keyframes cursorBlink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+/* Fade non-focused portions when inactive */
+.cursor-snippet:not([data-active="true"]) .cursor-snippet__line:not(.cursor-snippet__line--cursor) {
+  opacity: 0.4;
+}
+
+/* Syntax highlighting colors (VSCode Dark theme) */
+/* Keywords */
+.cursor-snippet__line-content .keyword {
+  color: #c586c0;
+}
+
+/* Strings */
+.cursor-snippet__line-content .string {
+  color: #ce9178;
+}
+
+/* Comments */
+.cursor-snippet__line-content .comment {
+  color: #6a9955;
+  font-style: italic;
+}
+
+/* Functions */
+.cursor-snippet__line-content .function {
+  color: #dcdcaa;
+}
+
+/* Numbers */
+.cursor-snippet__line-content .number {
+  color: #b5cea8;
+}
+
+/* Operators */
+.cursor-snippet__line-content .operator {
+  color: #d4d4d4;
+}
+
+/* Types/Classes */
+.cursor-snippet__line-content .type {
+  color: #4ec9b0;
+}
+
+/* Variables */
+.cursor-snippet__line-content .variable {
+  color: #9cdcfe;
+}
+
+/* Properties */
+.cursor-snippet__line-content .property {
+  color: #9cdcfe;
+}
+
+/* Tags (HTML/JSX) */
+.cursor-snippet__line-content .tag {
+  color: #569cd6;
+}
+
+/* Attributes */
+.cursor-snippet__line-content .attribute {
+  color: #9cdcfe;
+}
+
+/* Punctuation */
+.cursor-snippet__line-content .punctuation {
+  color: #d4d4d4;
+}
+
+/* Scrollbar styling */
+.cursor-snippet::-webkit-scrollbar {
+  height: 4px;
+}
+
+.cursor-snippet::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cursor-snippet::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.cursor-snippet::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .cursor-snippet {
+    font-size: 12px;
+  }
+
+  .cursor-snippet__line-number {
+    width: calc(var(--line-number-width, 2) * 1ch + 12px);
+    padding-right: 12px;
+    font-size: 0.85em;
+  }
+}

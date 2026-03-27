@@ -1,0 +1,223 @@
+/* ===================================================================
+   editor-columns.css — Multi-column split pane styling
+   =================================================================== */
+
+/* ===== Column Container ===== */
+
+.editor-columns {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  overflow: hidden;
+  background: rgba(30, 32, 44, 0.35);
+  backdrop-filter: blur(10px);
+  position: relative;
+}
+
+.editor-columns--empty {
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-columns__empty-state {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ===== Individual Column ===== */
+
+.editor-column {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  transition: box-shadow 150ms ease;
+}
+
+.editor-column--active {
+  box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.1);
+}
+
+.editor-column__content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== Resizable Divider ===== */
+
+.editor-column {
+  position: relative; /* For absolute divider positioning */
+}
+
+.editor-divider {
+  position: absolute;
+  right: -1.5px; /* Center divider on column border */
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 150ms ease, box-shadow 150ms ease;
+  z-index: 10;
+  user-select: none;
+}
+
+.editor-divider:hover,
+.editor-divider:focus {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+  outline: none;
+}
+
+.editor-divider:active {
+  background: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
+}
+
+/* ===== Tab Bar ===== */
+
+.editor-tab-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 35px;
+  min-height: 35px;
+  background: rgba(20, 22, 30, 0.5);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.editor-tab-bar--empty {
+  justify-content: space-between;
+  padding: 0 12px;
+}
+
+.editor-tab-bar__empty-text {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.editor-tab-bar__tabs {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
+}
+
+.editor-tab-bar__tabs::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.editor-tab-bar__extra {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+/* ===== Individual Tab ===== */
+
+.editor-tab {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 100%;
+  min-width: 80px;
+  max-width: 200px;
+  padding: 0 8px;
+  background: transparent;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  user-select: none;
+  transition: background 150ms ease, border-bottom 150ms ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.editor-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.editor-tab--active {
+  background: rgba(40, 44, 55, 0.6);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.editor-tab__title {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  gap: 6px;
+}
+
+.editor-tab--active .editor-tab__title {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.editor-tab__modified {
+  color: rgba(255, 215, 0, 0.9);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.editor-tab__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+
+.editor-tab:hover .editor-tab__close {
+  opacity: 1;
+}
+
+.editor-tab__close:hover {
+  background: rgba(255, 100, 100, 0.2);
+  color: rgba(255, 100, 100, 0.9);
+}
+
+.editor-tab__close:active {
+  transform: scale(0.95);
+}
+
+/* ===== Responsive Adjustments ===== */
+
+@media (max-width: 768px) {
+  .editor-tab {
+    min-width: 60px;
+    max-width: 150px;
+    padding: 0 6px;
+  }
+
+  .editor-tab__title {
+    font-size: 12px;
+  }
+
+  .editor-divider {
+    width: 4px; /* Wider touch target on mobile */
+  }
+}

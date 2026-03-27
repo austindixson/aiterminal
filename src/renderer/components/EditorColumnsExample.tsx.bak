@@ -1,0 +1,413 @@
+/**
+ * EditorColumnsExample — Example integration of useEditorColumns hook
+ *
+ * This component demonstrates how to integrate the multi-column editor system
+ * with the existing file tree and App.tsx.
+ *
+ * Usage in App.tsx:
+ *   import { EditorColumnsExample } from './components/EditorColumnsExample'
+ *
+ *   <EditorColumnsExample
+ *     onFileSelect={handleFileTreeSelect}
+ *   />
+ */
+
+import { FC, useCallback } from 'react'
+import { useEditorColumns } from '@/renderer/hooks/useEditorColumns'
+import type { FileTab, EditorColumn } from '@/types/editor-columns'
+
+interface EditorColumnsExampleProps {
+  /** Callback when user wants to open a file */
+  onFileSelect?: (filePath: string) => void
+}
+
+export const EditorColumnsExample: FC<EditorColumnsExampleProps> = ({
+  onFileSelect,
+}) => {
+  const editorColumns = useEditorColumns()
+
+  // -------------------------------------------------------------------------
+  // Handle file selection from file tree
+  // -------------------------------------------------------------------------
+
+  const handleFileSelect = useCallback(
+    (filePath: string) => {
+      const activeColumnId = editorColumns.state.activeColumnId
+      if (!activeColumnId) {
+        console.warn('[EditorColumnsExample] No active column')
+        return
+      }
+
+      editorColumns.addTab(activeColumnId, filePath)
+
+      // Notify parent if needed
+      if (onFileSelect) {
+        onFileSelect(filePath)
+      }
+    },
+    [editorColumns, onFileSelect],
+  )
+
+  // -------------------------------------------------------------------------
+  // Handle tab interactions
+  // -------------------------------------------------------------------------
+
+  const handleTabClick = useCallback(
+    (columnId: string, tabId: string) => {
+      editorColumns.setActiveTab(columnId, tabId)
+      editorColumns.setActiveColumn(columnId)
+    },
+    [editorColumns],
+  )
+
+  const handleTabClose = useCallback(
+    (columnId: string, tabId: string) => {
+      editorColumns.closeTab(columnId, tabId)
+    },
+    [editorColumns],
+  )
+
+  // -------------------------------------------------------------------------
+  // Handle column resize (drag handle)
+  // -------------------------------------------------------------------------
+
+  const handleColumnResizeStart = useCallback(
+    (columnId: string, e: React.MouseEvent) => {
+      e.preventDefault()
+      const startX = e.clientX
+      const startWidth = e.currentTarget.parentElement?.offsetWidth || 0
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        const deltaX = moveEvent.clientX - startX
+        const containerWidth =
+          document.querySelector('.editor-columns-container')?.offsetWidth || 1
+        const newRatio = Math.max(0.1, Math.min(0.9, (startWidth + deltaX) / containerWidth))
+        editorColumns.setSplitRatio(columnId, newRatio)
+      }
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+      }
+
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+    },
+    [editorColumns],
+  )
+
+  // -------------------------------------------------------------------------
+  // Render helpers
+  // -------------------------------------------------------------------------
+
+  const renderTab = useCallback(
+    (columnId: string, tab: FileTab) => (
+      <div
+        key={tab.id}
+        className={`editor-tab ${tab.isActive ? 'active' : ''} ${tab.isModified ? 'modified' : ''}`}
+        onClick={() => handleTabClick(columnId, tab.id)}
+      >
+        <span className="editor-tab__title">
+          {tab.isModified && <span className="editor-tab__modified-indicator">●</span>}
+          {tab.title}
+        </span>
+        <button
+          className="editor-tab__close"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleTabClose(columnId, tab.id)
+          }}
+          aria-label="Close tab"
+        >
+          ×
+        </button>
+      </div>
+    ),
+    [handleTabClick, handleTabClose],
+  )
+
+  const renderColumn = useCallback(
+    (column: EditorColumn) => {
+      const isActive = column.id === editorColumns.state.activeColumnId
+      const widthStyle = column.splitRatio
+        ? { width: `${column.splitRatio * 100}%` }
+        : { flex: 1 }
+
+      return (
+        <div
+          key={column.id}
+          className={`editor-column ${isActive ? 'active' : ''}`}
+          style={widthStyle}
+        >
+          {/* Tab bar */}
+          <div className="editor-column__tabs">
+            {column.tabs.map((tab) => renderTab(column.id, tab))}
+          </div>
+
+          {/* Editor content area */}
+          <div className="editor-column__content">
+            {column.activeTabId ? (
+              <div className="editor-content">
+                {
+                  // In real implementation, this would render the actual file editor
+                  // For now, just show the file path
+                  column.tabs.find((t) => t.id === column.activeTabId)?.filePath
+                }
+              </div>
+            ) : (
+              <div className="editor-content--empty">
+                <p>No file open</p>
+                <p className="editor-content__hint">
+                  Double-click a file in the file tree to open it
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Resize handle (except for last column) */}
+          {editorColumns.state.columns.indexOf(column) <
+            editorColumns.state.columns.length - 1 && (
+            <div
+              className="editor-column__resize-handle"
+              onMouseDown={(e) => handleColumnResizeStart(column.id, e)}
+            />
+          )}
+        </div>
+      )
+    },
+    [
+      editorColumns.state.columns,
+      editorColumns.state.activeColumnId,
+      renderTab,
+      handleColumnResizeStart,
+    ],
+  )
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
+
+  return (
+    <div className="editor-columns-example">
+      {/* Toolbar with column controls */}
+      <div className="editor-toolbar">
+        <div className="editor-toolbar__info">
+          {editorColumns.state.columns.length} column
+          {editorColumns.state.columns.length !== 1 ? 's' : ''}
+        </div>
+        <div className="editor-toolbar__actions">
+          <button
+            className="editor-toolbar__button"
+            onClick={() => editorColumns.addColumn()}
+            disabled={editorColumns.state.columns.length >= 4}
+            title="Add column (Cmd+\\)"
+          >
+            Split
+          </button>
+        </div>
+      </div>
+
+      {/* Columns container */}
+      <div className="editor-columns-container">
+        {editorColumns.state.columns.map(renderColumn)}
+      </div>
+
+      {/* Keyboard shortcuts hint */}
+      <div className="editor-shortcuts-hint">
+        <kbd>Cmd+\</kbd> Split
+        {' · '}
+        <kbd>Cmd+Shift+W</kbd> Close Column
+        {' · '}
+        <kbd>Cmd+1/2/3/4</kbd> Focus Column
+      </div>
+
+      {/* Example: Expose file open handler for file tree integration */}
+      {/*
+        In your file tree component:
+        onFileDoubleClick={(path) => {
+          const activeColumnId = editorColumns.state.activeColumnId
+          if (activeColumnId) {
+            editorColumns.addTab(activeColumnId, path)
+          }
+        }}
+      */}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Example CSS (add to your components.css or create editor-columns.css)
+// ---------------------------------------------------------------------------
+
+/*
+.editor-columns-example {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.editor-toolbar__info {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.editor-toolbar__button {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.editor-toolbar__button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.editor-toolbar__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editor-columns-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.editor-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  border-right: 1px solid var(--border-color);
+  position: relative;
+}
+
+.editor-column.active {
+  background: var(--bg-active);
+}
+
+.editor-column__tabs {
+  display: flex;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.editor-tab {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-right: 1px solid var(--border-color);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.editor-tab:hover {
+  background: var(--bg-hover);
+}
+
+.editor-tab.active {
+  background: var(--bg-primary);
+  border-bottom: 2px solid var(--accent-color);
+}
+
+.editor-tab.modified .editor-tab__title {
+  font-style: italic;
+}
+
+.editor-tab__modified-indicator {
+  color: var(--warning-color);
+  margin-right: 4px;
+}
+
+.editor-tab__title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editor-tab__close {
+  margin-left: 8px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.editor-tab:hover .editor-tab__close {
+  opacity: 0.7;
+}
+
+.editor-tab__close:hover {
+  opacity: 1;
+}
+
+.editor-column__content {
+  flex: 1;
+  overflow: auto;
+}
+
+.editor-content {
+  padding: 16px;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.editor-content--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: 0.5;
+}
+
+.editor-content__hint {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.editor-column__resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.editor-column__resize-handle:hover {
+  background: var(--accent-color);
+}
+
+.editor-shortcuts-hint {
+  padding: 8px 12px;
+  font-size: 11px;
+  opacity: 0.5;
+  text-align: center;
+  border-top: 1px solid var(--border-color);
+}
+
+.editor-shortcuts-hint kbd {
+  padding: 2px 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  font-family: inherit;
+}
+*/

@@ -47,7 +47,7 @@ export function VRMModelSelector({ selectedIntern, onSelectIntern, onClose }: VR
         {/* Model Grid */}
         <div className="vrm-model-selector__grid">
           {models.map((model) => {
-            const isSelected = model.id === (selectedIntern || 'mei');
+            const isSelected = model.id === (selectedIntern || 'sora');
             return (
               <div
                 key={model.id}

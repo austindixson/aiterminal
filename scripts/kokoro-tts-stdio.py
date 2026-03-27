@@ -30,7 +30,8 @@ def _emit(obj: object) -> None:
 
 def _main() -> None:
     lang = os.environ.get("AITERMINAL_KOKORO_LANG", "a")
-    voice = os.environ.get("AITERMINAL_KOKORO_VOICE", "af_heart")
+    # Default to af_bella (cute young girl voice) instead of af_heart (older/mature)
+    voice = os.environ.get("AITERMINAL_KOKORO_VOICE", "af_bella")
     try:
         import numpy as np
         import soundfile as sf

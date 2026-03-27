@@ -38,6 +38,10 @@ export interface ChatState {
   readonly activeModelId?: string
   /** Router preset (balanced / performance / budget). */
   readonly activePresetLabel?: string
+  /** Claude Code CLI TUI mode is active */
+  readonly claudeMode?: boolean
+  /** Captured Claude TUI output */
+  readonly claudeTUIOutput?: ClaudeTUIOutput
 }
 
 export interface ChatConversation {
@@ -46,4 +50,20 @@ export interface ChatConversation {
   readonly messages: ReadonlyArray<ChatMessage>
   readonly createdAt: number
   readonly updatedAt: number
+}
+
+/** Claude Code TUI output captured from PTY */
+export interface ClaudeTUIOutput {
+  readonly sessionId: string
+  readonly content: string
+  readonly timestamp: number
+  readonly isActive: boolean
+}
+
+/** Code snippet with cursor position from Claude TUI */
+export interface ClaudeCursorSnippet {
+  readonly code: string
+  readonly language: string
+  readonly cursorLine: number
+  readonly filePath?: string
 }

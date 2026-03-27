@@ -11,6 +11,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { ttsLipSyncBridge } from '../vrm-tts-bridge'
 import { INTERNS } from '../../intern-config'
+import { facialEmoteController, type FacialEmotePreset } from '../vrm-facial-emotes'
 
 /**
  * Web Speech API — push-to-talk input + ElevenLabs TTS output.
@@ -18,6 +19,44 @@ import { INTERNS } from '../../intern-config'
  * Browser speechSynthesis is fallback only.
  * Kokoro removed - quality issues.
  */
+
+/**
+ * Detect appropriate facial emote from text content
+ *
+ * Analyzes text for emotional sentiment to trigger VRM facial expressions
+ * during TTS playback. Returns 'neutral' by default to let auto-blink handle it.
+ */
+function detectEmoteFromText(text: string): FacialEmotePreset {
+  const lower = text.toLowerCase()
+
+  // Positive sentiment → happy
+  if (/(great|good|success|perfect|excellent|awesome|wonderful|✓|✅)/.test(lower)) {
+    return 'happy'
+  }
+
+  // Error/warning sentiment → concerned
+  if (/(error|failed|warning|issue|problem|mistake|incorrect)/.test(lower)) {
+    return 'concerned'
+  }
+
+  // Surprise → surprised
+  if (/(wow|amazing|surprising|unexpected|incredible|unbelievable)/.test(lower)) {
+    return 'surprised'
+  }
+
+  // Questions → thinking
+  if (/[?!]/.test(text) || /(what|how|why|when|where|who|can you|could you)/.test(lower)) {
+    return 'thinking'
+  }
+
+  // Excitement → excited
+  if (/(exciting|breakthrough|discovery|found it|yes|got it)/.test(lower)) {
+    return 'excited'
+  }
+
+  // Default → neutral (let auto-blink handle it)
+  return 'neutral'
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SpeechRec = any
@@ -102,6 +141,13 @@ export function useVoiceIO(onTranscript?: (text: string) => void, activeIntern?:
 
     console.log('[useVoiceIO] Processing queue item:', text.substring(0, 50), 'for intern:', internId)
 
+    // Detect and trigger facial emote based on content
+    const emote = detectEmoteFromText(text)
+    console.log('[useVoiceIO] Triggering emote:', emote, 'for text:', text.substring(0, 30))
+    if (emote !== 'neutral') {
+      facialEmoteController.setEmote(emote)
+    }
+
     const elevenLabsKey = window.env.VITE_ELEVENLABS_API_KEY || import.meta.env.VITE_ELEVENLABS_API_KEY
 
     if (elevenLabsKey) {
@@ -145,8 +191,13 @@ export function useVoiceIO(onTranscript?: (text: string) => void, activeIntern?:
 
             // Play with lip-sync if available
             if (ttsLipSyncBridge['audioContext']) {
-              await ttsLipSyncBridge.playWithLipSync(await audioBlob.arrayBuffer())
+              await ttsLipSyncBridge.playWithLipSync(await audioBlob.arrayBuffer());
               URL.revokeObjectURL(audioUrl)
+
+              // Clear facial emote after TTS completes
+              if (emote !== 'neutral') {
+                facialEmoteController.clearEmote()
+              }
 
               // Continue queue after lip-sync completes
               isPlayingRef.current = false
@@ -160,6 +211,12 @@ export function useVoiceIO(onTranscript?: (text: string) => void, activeIntern?:
                 URL.revokeObjectURL(audioUrl)
                 currentAudioRef.current = null
                 isPlayingRef.current = false
+
+                // Clear facial emote after TTS completes
+                if (emote !== 'neutral') {
+                  facialEmoteController.clearEmote()
+                }
+
                 // Process next item in queue
                 processQueueRef.current?.()
               }
@@ -168,6 +225,12 @@ export function useVoiceIO(onTranscript?: (text: string) => void, activeIntern?:
                 URL.revokeObjectURL(audioUrl)
                 currentAudioRef.current = null
                 isPlayingRef.current = false
+
+                // Clear facial emote on error
+                if (emote !== 'neutral') {
+                  facialEmoteController.clearEmote()
+                }
+
                 console.error('[useVoiceIO] Audio playback error')
                 // Continue processing queue even on error
                 processQueueRef.current?.()
@@ -181,6 +244,11 @@ export function useVoiceIO(onTranscript?: (text: string) => void, activeIntern?:
         }
       } catch (e) {
         console.error('[useVoiceIO] ElevenLabs TTS error:', e)
+
+        // Clear facial emote on error
+        if (emote !== 'neutral') {
+          facialEmoteController.clearEmote()
+        }
       }
     }
 
@@ -193,11 +261,23 @@ export function useVoiceIO(onTranscript?: (text: string) => void, activeIntern?:
 
       u.onend = () => {
         isPlayingRef.current = false
+
+        // Clear facial emote after TTS completes
+        if (emote !== 'neutral') {
+          facialEmoteController.clearEmote()
+        }
+
         processQueueRef.current?.()
       }
 
       u.onerror = () => {
         isPlayingRef.current = false
+
+        // Clear facial emote on error
+        if (emote !== 'neutral') {
+          facialEmoteController.clearEmote()
+        }
+
         console.error('[useVoiceIO] speechSynthesis error')
         processQueueRef.current?.()
       }
@@ -208,6 +288,12 @@ export function useVoiceIO(onTranscript?: (text: string) => void, activeIntern?:
 
     // If we get here, TTS failed - continue queue
     isPlayingRef.current = false
+
+    // Clear facial emote on TTS failure
+    if (emote !== 'neutral') {
+      facialEmoteController.clearEmote()
+    }
+
     processQueueRef.current?.()
   }, [])
 
@@ -221,7 +307,7 @@ export function useVoiceIO(onTranscript?: (text: string) => void, activeIntern?:
     console.log('[useVoiceIO] speak() called with:', t.substring(0, 50))
 
     // Get voice ID for active intern (defaults to Rachel if no intern or intern has no voice configured)
-    const internId = activeIntern || 'mei'
+    const internId = activeIntern || 'sora'
     const internConfig = INTERNS[internId]
     const voiceId = internConfig?.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM' // Default to Rachel
     console.log('[useVoiceIO] Queueing TTS for intern:', internId, 'voice:', voiceId)

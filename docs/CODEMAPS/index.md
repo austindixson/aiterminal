@@ -1,17 +1,17 @@
 # AITerminal Codebase Index
 
-**Last Updated:** 2026-03-24
+**Last Updated:** 2026-03-25
 **Project:** AITerminal - AI/Shell Hybrid Terminal
-**Stack:** Electron + React + TypeScript + Vite
-**Total Files:** 113 TypeScript/TSX files
-**Total Lines:** ~24,305
+**Stack:** Electron + React + TypeScript + Vite + Three.js
+**Total Files:** 125 TypeScript/TSX files
+**Total Lines:** ~26,500
 
 ## Quick Navigation
 
-- **[Frontend](frontend.md)** - React UI components, hooks, styles (42 files, 2,470 lines)
-- **[Backend](backend.md)** - Electron main process, IPC handlers (13 files, 1,296 lines)
-- **[Integrations](integrations.md)** - Ecosystem bridges (1 file, 279 lines)
-- **[Shared Utilities](shared-utilities.md)** - AI, shell, themes, types (37 files, ~16K lines)
+- **[Frontend](frontend.md)** - React UI components, hooks, styles (48 files, 7,200 lines)
+- **[Backend](backend.md)** - Electron main process, IPC handlers (13 files, 2,470 lines)
+- **[Integrations](integrations.md)** - Ecosystem bridges (5 files, 177 lines)
+- **[Shared Utilities](shared-utilities.md)** - AI, shell, themes, types, agent-loop, vrm-models (45 files, 4,500 lines)
 
 ## Project Overview
 
@@ -39,6 +39,7 @@ AITerminal is a next-generation terminal application that seamlessly integrates 
 | **Terminal** | xterm.js | Terminal emulator with ANSI support |
 | **PTY** | node-pty | Pseudo-terminal spawning |
 | **AI** | OpenRouter API | Model routing and streaming |
+| **3D Avatars** | Three.js + @pixiv/three-vrm | VRM avatar visualization |
 | **Testing** | Vitest + Playwright | Unit and E2E tests |
 | **Types** | TypeScript | Type-safe development |
 
@@ -141,8 +142,8 @@ See [Integrations Codemap](integrations.md) for details.
 
 | Metric | Value |
 |--------|-------|
-| Total Files | 113 |
-| Total Lines | ~24,305 |
+| Total Files | 125 |
+| Total Lines | ~26,500 |
 | Languages | TypeScript, TSX |
-| Framework | React + Electron |
+| Framework | React + Electron + Three.js |
 | Test Coverage Target | 80%+ |

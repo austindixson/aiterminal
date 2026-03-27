@@ -1,9 +1,9 @@
 # Frontend Codemap
 
-**Last Updated:** 2026-03-24
+**Last Updated:** 2026-03-25
 **Area:** React UI (renderer process)
-**Total Files:** 40 (non-test TypeScript/TSX files)
-**Total Lines:** ~6,416
+**Total Files:** 48 (non-test TypeScript/TSX files)
+**Total Lines:** ~7,200
 **CSS Files:** 11
 
 ## Entry Points
@@ -17,20 +17,27 @@
 
 ```
 src/renderer/
-├── components/          # React components (21 files)
+├── components/          # React components (26 files)
 │   ├── Chat*.tsx       # Chat sidebar and messages
 │   ├── Terminal*.tsx   # Terminal view and tabs
 │   ├── CmdKBar.tsx     # Command palette (Cmd+K)
 │   ├── FileTree.tsx    # File browser component
 │   ├── DiffView.tsx    # Diff viewer for agent edits
 │   ├── Agent*.tsx      # Agent approval and cursors
-│   └── ...
-├── hooks/              # Custom React hooks (15 files)
+│   ├── InternAvatar.tsx # VRM 3D avatar visualizer
+│   ├── AgentSelector.tsx # Agent/intern dropdown selector
+│   ├── VRMModelSelector.tsx # VRM model picker modal
+│   └── icons/          # Icon components
+│       └── ToggleIcon.tsx # VS Code-style chevron toggles
+├── hooks/              # Custom React hooks (16 files)
 │   ├── useChat.ts      # Chat state management
 │   ├── useCmdK.ts      # Command palette logic
 │   ├── useAgent.ts     # Agent approval workflow
+│   ├── useAgentLoop.ts # Agent loop state and events
 │   ├── useTerminalTabs.ts # Multi-session tab management
 │   └── ...
+├── vrm-models.ts       # VRM model configurations
+├── vrm-preloader.ts    # VRM model caching and preloading
 └── styles/             # CSS modules (11 files)
     ├── chat.css
     ├── components.css
@@ -65,6 +72,10 @@ src/renderer/
 | `components/TroubleshootPopup.tsx` | Error troubleshooting modal |
 | `components/TroubleshootView.tsx` | Troubleshooting content viewer |
 | `components/GatewayVoiceStrip.tsx` | Voice I/O status indicator |
+| `components/InternAvatar.tsx` | 3D VRM avatar visualizer with expressions and cursor tracking |
+| `components/AgentSelector.tsx` | Minimal inline agent/intern dropdown selector |
+| `components/VRMModelSelector.tsx` | VRM model picker modal with tooltips |
+| `components/icons/ToggleIcon.tsx` | VS Code-style chevron toggle icons |
 
 ### Hooks (15 files)
 
@@ -73,6 +84,7 @@ src/renderer/
 | `hooks/useChat.ts` | Chat state, send messages, AI streaming, attachments |
 | `hooks/useCmdK.ts` | Command palette open/close, filtering, history |
 | `hooks/useAgent.ts` | Agent approval workflow, plan execution |
+| `hooks/useAgentLoop.ts` | Agent loop state, events, intern selection |
 | `hooks/useTerminalTabs.ts` | Multi-session PTY tab management |
 | `hooks/useTerminalLocation.ts` | Terminal position (center/bottom) toggle |
 | `hooks/useFileTree.ts` | File tree state, expand/collapse, navigation |
@@ -165,6 +177,8 @@ src/renderer/
 - **React 18** - UI framework (no StrictMode, avoids xterm double-mount)
 - **Vite** - Build tool and dev server
 - **xterm.js** - Terminal emulator (`@xterm/xterm`)
+- **Three.js** - 3D rendering engine for VRM avatars
+- **@pixiv/three-vrm** - VRM model loader and expression system
 - **TypeScript** - Type safety
 - **RCSS** - CSS modules (via Vite plugin)
 

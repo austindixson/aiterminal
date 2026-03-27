@@ -1,6 +1,6 @@
 # Backend Codemap
 
-**Last Updated:** 2026-03-24
+**Last Updated:** 2026-03-25
 **Area:** Electron Main Process
 **Total Files:** 13
 **Total Lines:** ~2,470

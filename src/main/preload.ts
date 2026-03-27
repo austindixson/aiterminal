@@ -35,8 +35,21 @@ interface SessionBuffer {
 
 const sessionBuffers = new Map<string, SessionBuffer>();
 
+// Global callback for all session data (used for TUI detection, etc.)
+let globalSessionCallback: ((sessionId: string, data: string) => void) | null = null;
+
 // Listen for session-data events (new session-aware channel)
 ipcRenderer.on('session-data', (_event, sessionId: string, data: string) => {
+  // Call global callback first (for TUI detection, etc.)
+  if (globalSessionCallback) {
+    try {
+      globalSessionCallback(sessionId, data);
+    } catch (e) {
+      console.error('[session-data] Global callback error:', e);
+    }
+  }
+
+  // Then deliver to specific session callback
   const session = sessionBuffers.get(sessionId);
   if (session?.callback) {
     session.callback(data);
@@ -198,6 +211,14 @@ const electronAPI: ElectronAPI = {
     return electronAPI.onSessionData(legacySessionId, callback);
   },
 
+  // Subscribe to all session data events across all terminals
+  onAnySessionData: (callback: (sessionId: string, data: string) => void) => {
+    globalSessionCallback = callback;
+    return () => {
+      globalSessionCallback = null;
+    };
+  },
+
   writeToPty: (data: string) => {
     // Use a default session ID for legacy compatibility
     const legacySessionId = 'legacy';
@@ -294,6 +315,103 @@ const electronAPI: ElectronAPI = {
 
   transcriptVacuum: () =>
     ipcRenderer.invoke('transcript:vacuum'),
+
+  // --- Claude Code CLI TUI capture ---
+  startTuiCapture: (sessionId: string) =>
+    ipcRenderer.invoke('start-tui-capture', sessionId),
+
+  stopTuiCapture: (sessionId: string) =>
+    ipcRenderer.invoke('stop-tui-capture', sessionId),
+
+  getTuiContent: (sessionId: string) =>
+    ipcRenderer.invoke('get-tui-content', sessionId),
+
+  onTuiContentUpdated: (callback: (data: { sessionId: string; content: string; timestamp: number }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: { sessionId: string; content: string; timestamp: number }) => {
+      callback(data);
+    };
+    ipcRenderer.on('tui-content-updated', handler);
+    return () => {
+      ipcRenderer.removeListener('tui-content-updated', handler);
+    };
+  },
+
+  // --- Claude Code CLI service ---
+  claudeCodeSpawn: (args?: string[]) =>
+    ipcRenderer.invoke('claude-code-spawn', args),
+
+  claudeCodeWrite: (input: string) =>
+    ipcRenderer.invoke('claude-code-write', input),
+
+  claudeCodeKill: () =>
+    ipcRenderer.invoke('claude-code-kill'),
+
+  claudeCodeIsRunning: () =>
+    ipcRenderer.invoke('claude-code-is-running'),
+
+  onClaudeCodeOutput: (callback: (data: string) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: string) => {
+      callback(data);
+    };
+    ipcRenderer.on('claude-code-output', handler);
+    return () => {
+      ipcRenderer.removeListener('claude-code-output', handler);
+    };
+  },
+
+  onClaudeCodeError: (callback: (error: string) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, error: string) => {
+      callback(error);
+    };
+    ipcRenderer.on('claude-code-error', handler);
+    return () => {
+      ipcRenderer.removeListener('claude-code-error', handler);
+    };
+  },
+
+  onClaudeCodeClose: (callback: (code: number) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, code: number) => {
+      callback(code);
+    };
+    ipcRenderer.on('claude-code-close', handler);
+    return () => {
+      ipcRenderer.removeListener('claude-code-close', handler);
+    };
+  },
+
+  // --- Claude Code log reading ---
+  getClaudeCodeLog: (limit?: number) =>
+    ipcRenderer.invoke('get-claude-code-log', limit),
+
+  startClaudeCodeLogWatcher: () =>
+    ipcRenderer.invoke('start-claude-code-log-watcher'),
+
+  stopClaudeCodeLogWatcher: () =>
+    ipcRenderer.invoke('stop-claude-code-log-watcher'),
+
+  onClaudeCodeLogUpdated: (callback: (data: { messages: any[]; timestamp: number }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: { messages: any[]; timestamp: number }) => {
+      callback(data);
+    };
+    ipcRenderer.on('claude-code-log-updated', handler);
+    return () => {
+      ipcRenderer.removeListener('claude-code-log-updated', handler);
+    };
+  },
 };
 
+// Expose environment variables from main process to renderer
+// This is needed because Vite's import.meta.env only works at build time,
+// not when loading from dev server in Electron renderer
+const exposedEnvVars = {
+  VITE_ELEVENLABS_API_KEY: process.env.VITE_ELEVENLABS_API_KEY || '',
+};
+
+console.log('[preload] Exposing env vars:', {
+  hasKey: !!process.env.VITE_ELEVENLABS_API_KEY,
+  keyLength: process.env.VITE_ELEVENLABS_API_KEY?.length,
+  first8: process.env.VITE_ELEVENLABS_API_KEY?.substring(0, 8)
+});
+
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
+contextBridge.exposeInMainWorld('env', exposedEnvVars);

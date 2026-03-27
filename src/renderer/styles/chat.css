@@ -35,24 +35,23 @@
 }
 
 /* ===== Resize Handle ===== */
+/* Note: ResizeHandle component handles styling via inline props.
+   These classes are for legacy/external use only. */
 
 .chat-resize-handle {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 4px;
-  cursor: col-resize;
-  z-index: 10;
-  transition: background 0.2s ease;
+  /* Let ResizeHandle component inline styles handle cursor, dimensions */
+  position: relative;
+  z-index: 50;
 }
 
 .chat-resize-handle:hover {
-  background: rgba(189, 147, 249, 0.3);
+  /* Visual feedback handled by component */
+  opacity: 1;
 }
 
 .chat-resize-handle:active {
-  background: rgba(189, 147, 249, 0.5);
+  /* Visual feedback handled by component */
+  opacity: 1;
 }
 
 /* ===== Header ===== */

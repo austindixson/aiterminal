@@ -11,6 +11,7 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     },
   },
+  envPrefix: ['VITE', 'ELEVENLABS'], // Allow VITE_ and ELEVENLABS_ prefixed env vars
   build: {
     outDir: resolve(__dirname, "dist/renderer"),
     emptyOutDir: true,

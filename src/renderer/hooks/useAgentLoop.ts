@@ -24,6 +24,7 @@ interface UseAgentLoopReturn {
   clearEvents: () => void;
   isRunning: boolean;
   activeIntern: string | null;
+  setActiveIntern: (intern: string) => void;
   error: string | null;
 }
 
@@ -33,15 +34,16 @@ export function useAgentLoop(options: UseAgentLoopOptions = {}): UseAgentLoopRet
   const [enabled, setEnabled] = useState(initialEnabled);
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [activeIntern, setActiveIntern] = useState<string | null>(null);
+  // Initialize to 'sora' by default - this ensures the prompt update always has a valid intern
+  const [activeIntern, setActiveIntern] = useState<string>('sora');
   const [error, setError] = useState<string | null>(null);
 
-  // Clear events when disabled
+  // Clear events when disabled (but keep the last selected intern)
   useEffect(() => {
     if (!enabled) {
       setEvents([]);
       setIsRunning(false);
-      setActiveIntern(null);
+      // Don't clear activeIntern - keep it for next time agent mode is enabled
       setError(null);
     }
   }, [enabled]);
@@ -144,15 +146,19 @@ export function useAgentLoop(options: UseAgentLoopOptions = {}): UseAgentLoopRet
     };
   }, [enabled]);
 
-  // Update AI system prompt when agent mode changes or intern switches
+  // Update AI system prompt when agent mode is enabled or intern switches
+  // Only update when agent mode is enabled - let chat handle it when disabled
   useEffect(() => {
+    if (!enabled) {
+      // Don't update prompt when agent mode is disabled - chat will handle it
+      return;
+    }
+
     const updatePrompt = async () => {
       try {
-        // Only update if agent mode is enabled AND we have an intern selected
-        // Default to 'mei' if agent mode is enabled but no intern yet
-        const internToUpdate = enabled ? (activeIntern || 'mei') : null;
+        const internToUpdate = activeIntern || 'sora';
         await window.electronAPI.updateInternSystemPrompt(internToUpdate);
-        console.log('[useAgentLoop] Updated system prompt for intern:', internToUpdate);
+        console.log('[useAgentLoop] Agent mode enabled, updated system prompt for intern:', internToUpdate);
       } catch (error) {
         console.error('[useAgentLoop] Failed to update system prompt:', error);
       }
@@ -170,6 +176,7 @@ export function useAgentLoop(options: UseAgentLoopOptions = {}): UseAgentLoopRet
     clearEvents,
     isRunning,
     activeIntern,
+    setActiveIntern,
     error
   };
 }

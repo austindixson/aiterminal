@@ -201,6 +201,31 @@ html {
   color: var(--terminal-fg);
 }
 
+.statusbar__copy-console {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  font-size: 14px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--ansi-bright-black);
+  line-height: 1;
+}
+
+.statusbar__copy-console:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--terminal-fg);
+  transform: scale(1.05);
+}
+
+.statusbar__copy-console:active {
+  transform: scale(0.95);
+}
+
 /* xterm overrides — force transparency so glass shows through */
 .xterm {
   height: 100%;
@@ -310,6 +335,13 @@ html {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(8px); }
+  10% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @keyframes dropdownOpen {

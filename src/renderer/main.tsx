@@ -24,6 +24,12 @@ import "./styles/file-picker.css";
 import "./styles/troubleshoot.css";
 import "./styles/agent-cursors.css";
 import "./styles/keybindings.css";
+import "./styles/editor-tabs.css";
+import "./styles/file-editor.css";
+import "./styles/speech-bubbles.css";
+import "./styles/virtual-assistant-chat.css";
+import "./components/RightSidebarBottom.css";
+import "./components/TerminalActivityView.css";
 
 const rootElement = document.getElementById("root");
 
@@ -31,5 +37,19 @@ if (!rootElement) {
   throw new Error("Root element not found. Ensure index.html contains <div id='root'></div>");
 }
 
-// No StrictMode — it double-mounts in dev, creating duplicate xterm instances
-createRoot(rootElement).render(<App />);
+// Add error boundary to catch React initialization errors
+try {
+  // No StrictMode — it double-mounts in dev, creating duplicate xterm instances
+  createRoot(rootElement).render(<App />);
+} catch (error) {
+  console.error('[main] Failed to render React app:', error);
+  // Show error on screen for debugging
+  rootElement.innerHTML = `
+    <div style="padding: 20px; color: white; font-family: monospace;">
+      <h2>Failed to load AITerminal</h2>
+      <pre style="background: rgba(255,0,0,0.1); padding: 10px; overflow: auto;">${error instanceof Error ? error.message : String(error)}</pre>
+      <p>Check the browser console (Cmd+Option+I) for more details.</p>
+    </div>
+  `;
+  throw error;
+}

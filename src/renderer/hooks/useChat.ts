@@ -197,7 +197,7 @@ export function useChat(): UseChatReturn {
       const api = window.electronAPI
       if (api?.updateInternSystemPrompt) {
         const agentState = (window as any).agentLoopState
-        const activeIntern = agentState?.activeIntern || 'mei'
+        const activeIntern = agentState?.activeIntern || 'sora'
         console.log('[useChat] Sending message, updating system prompt for intern:', activeIntern)
         await api.updateInternSystemPrompt(activeIntern)
       }
@@ -426,9 +426,9 @@ export function useChat(): UseChatReturn {
     if (isOpen) {
       const api = window.electronAPI
       if (api?.updateInternSystemPrompt) {
-        // Get active intern from global agent state, default to mei
+        // Get active intern from global agent state, default to sora
         const agentState = (window as any).agentLoopState
-        const activeIntern = agentState?.activeIntern || 'mei'
+        const activeIntern = agentState?.activeIntern || 'sora'
         console.log('[useChat] Chat opened, updating system prompt for intern:', activeIntern)
         api.updateInternSystemPrompt(activeIntern).catch((err) => {
           console.error('[useChat] Failed to update system prompt:', err)

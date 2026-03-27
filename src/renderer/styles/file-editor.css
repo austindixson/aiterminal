@@ -1,0 +1,296 @@
+/*
+ * Path: /Users/ghost/Desktop/aiterminal/src/renderer/styles/file-editor.css
+ * Module: renderer/styles
+ * Purpose: VSCode-style file editor styling with syntax highlighting
+ * Dependencies: none
+ * Related: /Users/ghost/Desktop/aiterminal/src/renderer/components/FileEditor.tsx
+ * Keywords: file-editor, vscode-style, syntax-highlighting, line-numbers
+ * Last Updated: 2026-03-25
+ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   File Editor Container
+   ═══════════════════════════════════════════════════════════════════ */
+
+.file-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--editor-background, #1e1e1e);
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Loading State
+   ═══════════════════════════════════════════════════════════════════ */
+
+.file-editor--loading {
+  align-items: center;
+  justify-content: center;
+}
+
+.file-editor__loading {
+  color: var(--editor-dim, #6e6e6e);
+  font-size: 14px;
+  padding: 2rem;
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Error State
+   ═══════════════════════════════════════════════════════════════════ */
+
+.file-editor--error {
+  align-items: center;
+  justify-content: center;
+}
+
+.file-editor__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 2rem;
+  max-width: 600px;
+  background: rgba(244, 71, 71, 0.1);
+  border: 1px solid rgba(244, 71, 71, 0.3);
+  border-radius: 6px;
+  margin: 1rem;
+}
+
+.file-editor__error-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.file-editor__error-message {
+  color: var(--editor-error, #f44747);
+  font-size: 14px;
+}
+
+.file-editor__error-message strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Large File Warning
+   ═══════════════════════════════════════════════════════════════════ */
+
+.file-editor__large-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 204, 0, 0.1);
+  border-bottom: 1px solid rgba(255, 204, 0, 0.3);
+}
+
+.file-editor__warning-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.file-editor__warning-message {
+  color: var(--editor-warning, #ffcc00);
+  font-size: 13px;
+}
+
+.file-editor__warning-message strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Editor Content Area
+   ═══════════════════════════════════════════════════════════════════ */
+
+.file-editor__content {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.file-editor__content--overflow {
+  /* For large files, allow virtual scrolling in future */
+  max-height: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Line Number Gutter
+   ═══════════════════════════════════════════════════════════════════ */
+
+.file-editor__gutter {
+  display: flex;
+  flex-direction: column;
+  background: var(--editor-gutter-background, #1e1e1e);
+  border-right: 1px solid var(--editor-border, #3c3c3c);
+  color: var(--editor-line-number, #858585);
+  padding-right: 1ch;
+  padding-left: 1ch;
+  text-align: right;
+  user-select: none;
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 10;
+}
+
+.file-editor__line-number {
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 1.6em;
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.file-editor__line-number:hover {
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Code Content Area
+   ═══════════════════════════════════════════════════════════════════ */
+
+.file-editor__code {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background: var(--editor-background, #1e1e1e);
+  color: var(--editor-foreground, #d4d4d4);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.file-editor__line {
+  display: flex;
+  align-items: center;
+  min-height: 1.6em;
+  line-height: 1.6;
+  padding-left: 0.5ch;
+  cursor: text;
+}
+
+.file-editor__line:hover {
+  background: var(--editor-line-hover, rgba(255, 255, 255, 0.04));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Syntax Highlighting (VSCode Dark Theme)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.file-editor__token {
+  display: inline;
+}
+
+/* Plain text */
+.file-editor__token--plain {
+  color: var(--editor-foreground, #d4d4d4);
+}
+
+/* Keywords (const, let, function, if, etc.) */
+.file-editor__token--keyword {
+  color: var(--editor-keyword, #569cd6);
+  font-weight: 500;
+}
+
+/* Strings */
+.file-editor__token--string {
+  color: var(--editor-string, #ce9178);
+}
+
+/* Numbers */
+.file-editor__token--number {
+  color: var(--editor-number, #b5cea8);
+}
+
+/* Comments */
+.file-editor__token--comment {
+  color: var(--editor-comment, #6a9955);
+  font-style: italic;
+}
+
+/* Operators (+, -, *, /, etc.) */
+.file-editor__token--operator {
+  color: var(--editor-operator, #d4d4d4);
+}
+
+/* Functions */
+.file-editor__token--function {
+  color: var(--editor-function, #dcdcaa);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Scrollbar Styling
+   ═══════════════════════════════════════════════════════════════════ */
+
+.file-editor__content::-webkit-scrollbar,
+.file-editor__code::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.file-editor__content::-webkit-scrollbar-track,
+.file-editor__code::-webkit-scrollbar-track {
+  background: var(--editor-scrollbar-track, #1e1e1e);
+}
+
+.file-editor__content::-webkit-scrollbar-thumb,
+.file-editor__code::-webkit-scrollbar-thumb {
+  background: var(--editor-scrollbar-thumb, #424242);
+  border: 3px solid var(--editor-scrollbar-track, #1e1e1e);
+  border-radius: 7px;
+}
+
+.file-editor__content::-webkit-scrollbar-thumb:hover,
+.file-editor__code::-webkit-scrollbar-thumb:hover {
+  background: var(--editor-scrollbar-thumb-hover, #4f4f4f);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Theme Variables (Default: VSCode Dark)
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --editor-background: #1e1e1e;
+  --editor-foreground: #d4d4d4;
+  --editor-gutter-background: #1e1e1e;
+  --editor-border: #3c3c3c;
+  --editor-line-number: #858585;
+  --editor-line-hover: rgba(255, 255, 255, 0.04);
+  --editor-keyword: #569cd6;
+  --editor-string: #ce9178;
+  --editor-number: #b5cea8;
+  --editor-comment: #6a9955;
+  --editor-operator: #d4d4d4;
+  --editor-function: #dcdcaa;
+  --editor-error: #f44747;
+  --editor-warning: #ffcc00;
+  --editor-dim: #6e6e6e;
+  --editor-scrollbar-track: #1e1e1e;
+  --editor-scrollbar-thumb: #424242;
+  --editor-scrollbar-thumb-hover: #4f4f4f;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Responsive Adjustments
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .file-editor {
+    font-size: 13px;
+  }
+
+  .file-editor__gutter {
+    padding-left: 0.5ch;
+    padding-right: 0.5ch;
+  }
+
+  .file-editor__line {
+    padding-left: 0.25ch;
+  }
+}

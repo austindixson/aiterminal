@@ -8,7 +8,7 @@
  * Last Updated: 2026-03-24
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { Theme } from '@/themes/types'
@@ -24,13 +24,19 @@ export interface TerminalViewProps {
   readonly isActive?: boolean
 }
 
-export const TerminalView: React.FC<TerminalViewProps> = ({
-  onCommand,
-  onPtyOutput,
-  theme,
-  sessionId,
-  isActive = true,
-}) => {
+export interface TerminalViewRef {
+  readonly terminal: Terminal | null
+  selectAll: () => void
+}
+
+export const TerminalView = forwardRef<TerminalViewRef, TerminalViewProps>((props, ref) => {
+  const {
+    onCommand,
+    onPtyOutput,
+    theme,
+    sessionId,
+    isActive = true,
+  } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -189,6 +195,14 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
     return () => cancelAnimationFrame(id)
   }, [isActive])
 
+  // Expose terminal methods via ref
+  useImperativeHandle(ref, () => ({
+    terminal: terminalRef.current,
+    selectAll: () => {
+      terminalRef.current?.selectAll()
+    },
+  }), [])
+
   return (
     <div
       ref={containerRef}
@@ -196,4 +210,6 @@ export const TerminalView: React.FC<TerminalViewProps> = ({
       data-testid="terminal-view"
     />
   )
-}
+})
+
+TerminalView.displayName = 'TerminalView'

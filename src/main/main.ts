@@ -43,7 +43,8 @@ import './transcript-handlers.js';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 const DEV_SERVER_URL = 'http://localhost:5173';
-const RENDERER_PATH = join(__dirname, '../renderer/index.html');
+// In production, __dirname is dist/main/main.js, so we need to go up to dist/ then into renderer/
+const RENDERER_PATH = join(__dirname, '../../renderer/index.html');
 
 // ---------------------------------------------------------------------------
 // AI client configuration
@@ -135,13 +136,31 @@ function createWindow(): BrowserWindow {
     window.loadFile(RENDERER_PATH);
   }
 
-  // Register Cmd+Option+I to toggle DevTools (docked bottom, not detached)
+  // Register Cmd+Option+I to toggle DevTools with terminal panel
   window.webContents.on('before-input-event', (_event, input) => {
     if (input.meta && input.alt && input.key === 'i') {
       if (window.webContents.isDevToolsOpened()) {
         window.webContents.closeDevTools();
       } else {
+        // Open DevTools with terminal panel enabled
         window.webContents.openDevTools({ mode: 'bottom' });
+
+        // Switch to terminal panel after DevTools opens
+        // DevTools needs a moment to initialize, so we use a small delay
+        setTimeout(() => {
+          window.webContents.executeJavaScript(`
+            // Try to switch to terminal panel using DevTools API
+            if (typeof DevToolsAPI !== 'undefined' && DevToolsAPI.embedder) {
+              DevToolsAPI.embedder.showPanel('terminal');
+            }
+            // Alternative: try Chrome DevTools API
+            if (typeof chrome !== 'undefined' && chrome.devtools && chrome.devtools.panels) {
+              chrome.devtools.panels.openResource('terminal://');
+            }
+          `).catch(() => {
+            // Silently fail if DevTools API isn't available yet
+          });
+        }, 300);
       }
     }
   });

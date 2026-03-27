@@ -1,17 +1,19 @@
 # Shared Utilities Codemap
 
-**Last Updated:** 2026-03-24
-**Area:** Shared Utilities (ai, shell, themes, file-tree, types)
-**Total Files:** 38
-**Total Lines:** 4,060
+**Last Updated:** 2026-03-25
+**Area:** Shared Utilities (ai, shell, themes, file-tree, types, agent-loop, vrm-models)
+**Total Files:** 45
+**Total Lines:** 4,500
 
 ## Architecture
 ```
 src/
 ├── ai/                  # OpenRouter client, streaming
+├── agent-loop/          # Agent loop events and handlers
 ├── shell/               # Natural language detection
 ├── themes/              # Terminal color schemes
 ├── file-tree/           # Directory traversal
+├── renderer/            # VRM model utilities
 └── types/               # Shared TypeScript types
 ```
 
@@ -113,6 +115,51 @@ src/
 | `agent-cursor.ts` | Cursor animation types |
 
 **Dependencies:** None (type definitions only)
+
+---
+
+## Agent Loop Module (`src/agent-loop/`)
+
+**Entry Points:** `events.ts`, `handlers.ts`
+
+| File | Purpose |
+|------|---------|
+| `events.ts` | AgentEvent types, lifecycle event definitions |
+| `handlers.ts` | IPC handlers for agent loop operations |
+| `agent-loop-handlers.ts` | Main process agent loop handlers |
+| `transcript-handlers.ts` | Lossless recall transcript handlers |
+
+**Key Types:**
+- `AgentEvent` - Stream, lifecycle, tool, handoff, error events
+- `AgentLoopResult` - Execution result with runId and status
+- `AgentStreamOptions` - Streaming configuration
+
+**Dependencies:** Electron IPC, agent registry
+
+---
+
+## VRM Models Module (`src/renderer/`)
+
+**Entry Points:** `vrm-models.ts`, `vrm-preloader.ts`
+
+| File | Purpose |
+|------|---------|
+| `vrm-models.ts` | VRM model configurations for interns (Mei, Sora, Hana) |
+| `vrm-preloader.ts` | VRM model caching and preloading system |
+
+**Key Functions:**
+- `getModelForIntern(intern: string): VRMModelConfig` - Get model by intern ID
+- `getAllModels(): VRMModelConfig[]` - Get all available models
+- `getPreloadedVRM(intern: string): PreloadedVRM | null` - Get cached model
+
+**Models:**
+- **mei** (美) - Dev specialist - Default VRM model
+- **sora** (空) - Research specialist
+- **hana** (花) - Content & business specialist
+
+**Dependencies:** Three.js, @pixiv/three-vrm
+
+---
 
 ## Data Flow
 

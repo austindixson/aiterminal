@@ -8,7 +8,7 @@
  * Last Updated: 2026-03-24
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import type { FC } from 'react'
 import type { AIResponse } from '@/ai/types'
 import type { FilePickerResult } from '@/types/file-context'
@@ -43,8 +43,10 @@ import { InternAvatar } from '@/renderer/components/InternAvatar'
 import { SplitSidebar } from '@/renderer/components/SplitSidebar'
 import { GatewayVoiceStrip } from '@/renderer/components/GatewayVoiceStrip'
 import { ResizeHandle } from '@/renderer/components/ResizeHandle'
-import { RightSidebarBottom } from '@/renderer/components/RightSidebarBottom'
+import { SpeechBubbles, useSpeechBubbles } from '@/renderer/components/SpeechBubbles'
+import { VirtualAssistantChat } from '@/renderer/components/VirtualAssistantChat'
 import { useAgentLoop } from '@/renderer/hooks/useAgentLoop'
+import { useClaudeCodeComments } from '@/renderer/hooks/useClaudeCodeComments'
 import { preloadVRMModels } from '@/renderer/vrm-preloader'
 import { AVAILABLE_VRM_MODELS } from '@/renderer/vrm-models'
 
@@ -86,19 +88,38 @@ export const App: FC = () => {
     defaultSizes: {
       leftSidebar: 280,
       terminalArea: 400,
+      rightSidebar: 400,
     },
     minSizes: {
       leftSidebar: 200,
       terminalArea: 200,
+      rightSidebar: 300,
     },
     maxSizes: {
       leftSidebar: 600,
       terminalArea: 800,
+      rightSidebar: 800,
     },
   })
 
   // Voice I/O for TTS (Amica-style voice chat)
-  const voice = useVoiceIO(undefined, agentLoop.activeIntern || 'mei')
+  const voice = useVoiceIO(undefined, agentLoop.activeIntern || 'sora')
+
+  // Claude Code comments - contextual voice feedback during Claude Code sessions
+  const claudeCodeComments = useClaudeCodeComments({
+    minCommentInterval: 15000, // 15 seconds between comments
+    onComment: (comment) => {
+      // Speak the comment via TTS
+      voice.speak(comment).catch((err) => {
+        console.error('[App] Failed to speak Claude Code comment:', err)
+      })
+      // Also add as speech bubble
+      speechBubbles.addBubble(comment)
+    },
+  })
+
+  // Speech bubbles for VRM avatar
+  const speechBubbles = useSpeechBubbles()
 
   // Listen for AI response events to auto-speak
   useEffect(() => {
@@ -123,14 +144,14 @@ export const App: FC = () => {
   // Expose active intern globally for chat to access
   // Initialize immediately (synchronous) so it's available before first render
   ;(window as any).agentLoopState = {
-    activeIntern: agentLoop.activeIntern || 'mei',
+    activeIntern: agentLoop.activeIntern || 'sora',
     enabled: agentLoop.enabled
   }
 
   // Update when values change
   useEffect(() => {
     (window as any).agentLoopState = {
-      activeIntern: agentLoop.activeIntern || 'mei',
+      activeIntern: agentLoop.activeIntern || 'sora',
       enabled: agentLoop.enabled
     }
   }, [agentLoop.activeIntern, agentLoop.enabled])
@@ -143,11 +164,25 @@ export const App: FC = () => {
     }
   }, [backendSelector.activeBackend, chat.state.isOpen])
 
+  // Activate/deactivate Claude Code comments based on backend
+  useEffect(() => {
+    if (backendSelector.activeBackend === 'claude-code') {
+      console.log('[App] Claude Code backend active, enabling comments')
+      claudeCodeComments.activate()
+    } else {
+      console.log('[App] Claude Code backend inactive, disabling comments')
+      claudeCodeComments.deactivate()
+    }
+  }, [backendSelector.activeBackend, claudeCodeComments])
+
   // NL routing toast
   const [nlToast, setNlToast] = useState<string | null>(null)
 
   // Terminal visibility when in Claude Code mode
   const [terminalVisibleInClaudeCode, setTerminalVisibleInClaudeCode] = useState(false)
+
+  // 3D model chat visibility - hidden by default to show avatar more clearly
+  const [showVrmChat, setShowVrmChat] = useState(false)
 
   // TUI Mode: disable natural language interception for CLI tools
   const [tuiMode, setTuiMode] = useState(false)
@@ -158,8 +193,11 @@ export const App: FC = () => {
     tuiModeRef.current = tuiMode
   }, [tuiMode])
 
-  // Active terminal session cwd (file tree + picker); synced from PTY via main process
-  const [activeTabCwd, setActiveTabCwd] = useState('')
+  // Active terminal session cwd (file tree + picker); derived from active tab
+  const activeTabCwd = useMemo(() => {
+    const activeTab = terminalTabs.state.tabs.find(t => t.isActive)
+    return activeTab?.cwd || ''
+  }, [terminalTabs.state.tabs])
 
   // Refresh cwd when switching tabs (probes real shell cwd from PTY pid)
   useEffect(() => {
@@ -180,7 +218,8 @@ export const App: FC = () => {
     window.electronAPI.getSessionCwd(sessionId).then((result) => {
       if (cancelled) return
       if (result.success && result.cwd) {
-        setActiveTabCwd(result.cwd)
+        // Update session cwd in main process (will trigger session-cwd-changed event)
+        window.electronAPI.updateSessionCwd?.(sessionId, result.cwd)
       }
     }).catch(() => {
       /* keep previous cwd */
@@ -192,23 +231,6 @@ export const App: FC = () => {
 
   const fileTree = useFileTree(activeTabCwd)
   const filePicker = useFilePicker(activeTabCwd)
-
-  // Resizable panels state
-  const { sizes, updateSize } = useResizablePanels({
-    storageKey: 'aiterminal-panel-sizes',
-    defaultSizes: {
-      leftSidebar: 250,
-      rightSidebar: 400,
-    },
-    minSizes: {
-      leftSidebar: 200,
-      rightSidebar: 300,
-    },
-    maxSizes: {
-      leftSidebar: 600,
-      rightSidebar: 800,
-    },
-  })
 
   // -------------------------------------------------------------------------
   // AI response state (existing)
@@ -428,7 +450,6 @@ export const App: FC = () => {
               if (result.success && result.cwd) {
                 // Update session manager and trigger tab update
                 window.electronAPI.updateSessionCwd(sessionId, result.cwd);
-                setActiveTabCwd(result.cwd)
               }
             }).catch(() => {
               /* ignore */
@@ -554,12 +575,93 @@ export const App: FC = () => {
     setTimeout(() => {
       window.electronAPI.getSessionCwd(sessionId).then((result) => {
         if (result.success && result.cwd) {
-          setActiveTabCwd(result.cwd)
+          // Update session cwd in main process (will trigger session-cwd-changed event)
+          window.electronAPI.updateSessionCwd?.(sessionId, result.cwd)
         }
       }).catch(() => {
         /* ignore */
       })
     }, 120)
+  }, [terminalTabs])
+
+  // -------------------------------------------------------------------------
+  // Auto-detect cd commands and update cwd for tabs and 3D model
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const hasElectronAPI =
+      typeof window !== 'undefined' &&
+      'electronAPI' in window &&
+      window.electronAPI?.onAnySessionData
+
+    if (!hasElectronAPI) return
+
+    // Track last command per session to avoid duplicate probes
+    const lastCommandRef = new Map<string, string>()
+    const probeTimeoutRef = new Map<string, ReturnType<typeof setTimeout>>()
+
+    const unsubscribe = window.electronAPI.onAnySessionData?.((sessionId, data) => {
+      // Detect cd commands in terminal output
+      // Look for command patterns like "cd path", "cd ~/path", "cd ..", "cd /path"
+      const lines = data.split('\n')
+      for (const line of lines) {
+        const trimmed = line.trim()
+
+        // Skip empty lines and non-command lines
+        if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('echo')) {
+          continue
+        }
+
+        // Match cd command at the start of a line (shell prompt)
+        // Common patterns: "cd path", "cd ~/path", "cd ..", "cd ../", "cd /abs/path"
+        const cdMatch = trimmed.match(/^(cd\s+)([^\s;&|]+)/)
+
+        if (cdMatch) {
+          const cdCommand = trimmed
+
+          // Avoid probing the same command multiple times
+          if (lastCommandRef.get(sessionId) === cdCommand) {
+            continue
+          }
+          lastCommandRef.set(sessionId, cdCommand)
+
+          // Clear any pending probe for this session
+          const existingTimeout = probeTimeoutRef.get(sessionId)
+          if (existingTimeout) {
+            clearTimeout(existingTimeout)
+          }
+
+          // Debounce slightly to let the cd complete before probing
+          const timeoutId = setTimeout(() => {
+            console.log(`[App] Detected cd command in session ${sessionId}, probing new cwd`)
+
+            // Probe the new cwd from PTY pid
+            window.electronAPI.getSessionCwd?.(sessionId).then((result) => {
+              if (result.success && result.cwd) {
+                console.log(`[App] Updated cwd for session ${sessionId}: ${result.cwd}`)
+
+                // Update the session's cwd in main process
+                // This will trigger session-cwd-changed event which updates tabs
+                // and activeTabCwd is derived from tabs, so it will update automatically
+                window.electronAPI.updateSessionCwd?.(sessionId, result.cwd)
+              }
+            }).catch(() => {
+              /* ignore probe failures */
+            })
+          }, 150) // 150ms debounce to let cd complete
+
+          probeTimeoutRef.set(sessionId, timeoutId)
+          break // Only process first cd match per data chunk
+        }
+      }
+    })
+
+    return () => {
+      unsubscribe?.()
+      // Clear all pending timeouts
+      for (const timeoutId of probeTimeoutRef.values()) {
+        clearTimeout(timeoutId)
+      }
+    }
   }, [terminalTabs])
 
   // -------------------------------------------------------------------------
@@ -742,7 +844,7 @@ export const App: FC = () => {
         {/* ── Split Sidebar (left panel: file tree + terminal tabs) ── */}
         {fileTree.isVisible && (
           <>
-            <div className="split-sidebar-wrapper" style={{ width: sizes.leftSidebar }}>
+            <div className="split-sidebar-wrapper" style={{ width: resizablePanels.sizes.leftSidebar }}>
               <SplitSidebar
                 tabs={terminalTabs.state.tabs}
                 activeTabId={terminalTabs.state.activeTabId}
@@ -768,11 +870,10 @@ export const App: FC = () => {
         )}
 
         {/* ── Terminal area (center: terminals + chat panels stacked) ── */}
-        <div className="terminal-area">
+        <div className="terminal-area" style={{ flex: 1 }}>
           {/* Terminal panel (top) - hide when Claude Code TUI is active unless explicitly shown */}
           {(backendSelector.activeBackend !== 'claude-code' || terminalVisibleInClaudeCode) && (
             <div className="terminal-panel" style={{
-              flex: backendSelector.activeBackend === 'claude-code' && terminalVisibleInClaudeCode ? 0 : undefined,
               height: backendSelector.activeBackend === 'claude-code' && terminalVisibleInClaudeCode
                 ? resizablePanels.sizes.terminalArea * 0.5  // Half height when in Claude Code mode
                 : backendSelector.activeBackend === 'claude-code' ? 0 : resizablePanels.sizes.terminalArea,
@@ -836,13 +937,14 @@ export const App: FC = () => {
                 }}
                 backend={backendSelector.activeBackend}
                 claudeCodeStream={backendSelector.claudeCodeStream}
-                activeIntern={agentLoop.activeIntern || 'mei'}
+                activeIntern={agentLoop.activeIntern || 'sora'}
                 modelLabel={chat.state.activeModelLabel}
                 presetLabel={chat.state.activePresetLabel}
                 writeToClaudeCode={backendSelector.writeToClaudeCode}
                 clearClaudeCodeStream={backendSelector.clearClaudeCodeStream}
                 onToggleTerminal={() => setTerminalVisibleInClaudeCode(prev => !prev)}
                 terminalVisible={terminalVisibleInClaudeCode}
+                isWaitingForPermissions={backendSelector.isWaitingForPermissions}
                 placeholder={backendSelector.activeBackend === 'claude-code' ? 'Type a command to Claude Code...' : 'Type a message or use @ for file context...'}
                 onClose={() => {
                   chat.close()
@@ -877,46 +979,50 @@ export const App: FC = () => {
           </div>
         )}
 
-        {/* ── Right Sidebar (agent + terminal tabs) ── */}
+        {/* ── Right Sidebar (VRM avatar + chat overlay) ── */}
         {(agentLoop.enabled || chat.state.isOpen) && (
           <>
             <ResizeHandle
               direction="horizontal"
-              onDrag={(delta) => updateSize('rightSidebar', -delta)}
+              onDrag={(delta) => resizablePanels.updateSize('rightSidebar', -delta)}
               minSize={300}
               maxSize={800}
             />
-            <div className="right-sidebar" style={{ width: sizes.rightSidebar }}>
-              {/* Top: Agent avatar */}
-              <div className="right-sidebar__agent">
+            <div className="right-sidebar" style={{ width: resizablePanels.sizes.rightSidebar }}>
+              {/* VRM Avatar - full height */}
+              <div className="right-sidebar__avatar">
                 <InternAvatar
-                  intern={agentLoop.activeIntern || 'mei'}
+                  intern={agentLoop.activeIntern || 'sora'}
                   isRunning={agentLoop.isRunning}
                   events={agentLoop.events}
                   onInternSelect={agentLoop.setActiveIntern}
-                  isStreaming={chat.state.isOpen}  // Streaming when chat is open
+                  isStreaming={chat.state.isOpen}
                   hasInput={false}
                   activeSessionCwd={activeTabCwd}
                   activeSessionId={terminalTabs.state.activeTabId ?? undefined}
+                  showVrmChat={showVrmChat}
+                  onToggleVrmChat={() => setShowVrmChat(!showVrmChat)}
                 />
               </div>
 
-              {/* Bottom: Tabbed interface */}
-              <RightSidebarBottom
-                terminalSessions={terminalTabs.state.tabs.map(tab => ({
-                  id: tab.id,
-                  name: tab.name,
-                  output: [] // TODO: Capture PTY output for activity view
-                }))}
-                activeAgentsCount={agentLoop.isRunning ? 1 : 0}
-                statisticsData={{
-                  totalCommands: 0, // TODO: Track command statistics
-                  successfulCommands: 0,
-                  failedCommands: 0,
-                  aiQueries: chat.state.messages.length,
-                  uptime: '0:00:00' // TODO: Track session uptime
-                }}
+              {/* Speech Bubbles - floating overlay */}
+              <SpeechBubbles
+                messages={speechBubbles.bubbles}
+                onRemove={speechBubbles.removeBubble}
               />
+
+              {/* Virtual Assistant Chat - transparent overlay */}
+              {showVrmChat && chat.state.isOpen && (
+                <VirtualAssistantChat
+                  messages={[...chat.state.messages]}
+                  onSendMessage={async (msg) => {
+                    await chat.sendMessage(msg)
+                    // Add user message as speech bubble
+                    speechBubbles.addBubble(msg)
+                  }}
+                  isStreaming={chat.state.isStreaming}
+                />
+              )}
             </div>
           </>
         )}

@@ -1,0 +1,78 @@
+.terminal-activity-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin: 8px;
+}
+
+.terminal-activity-view::-webkit-scrollbar {
+  width: 6px;
+}
+
+.terminal-activity-view::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.terminal-activity-view::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.terminal-activity-view::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.terminal-activity__session {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.terminal-activity__session:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.terminal-activity__session-name {
+  color: #7aa2f7;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.terminal-activity__output {
+  color: #a9b1d6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.terminal-activity__no-output {
+  color: rgba(169, 177, 214, 0.5);
+  font-style: italic;
+  font-size: 11px;
+}
+
+.terminal-activity--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.terminal-activity__empty-state {
+  color: rgba(169, 177, 214, 0.5);
+  font-size: 12px;
+  font-style: italic;
+}

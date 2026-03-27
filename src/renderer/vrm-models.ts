@@ -47,7 +47,7 @@ export const AVAILABLE_VRM_MODELS: Record<string, VRMModelConfig> = {
     id: 'sora',
     name: 'sora',
     displayName: 'SORA',
-    url: './models/AvatarSample_B.vrm',
+    url: './models/hana.vrm', // Swapped with Hana
     thumbnail: '',
     description: 'Research & analysis expert. Data-driven insights and market research.',
     personality: 'Curious, thorough, detail-oriented',
@@ -59,7 +59,7 @@ export const AVAILABLE_VRM_MODELS: Record<string, VRMModelConfig> = {
     id: 'hana',
     name: 'hana',
     displayName: 'HANA',
-    url: './models/AvatarSample_C.vrm',
+    url: './models/sora.vrm', // Swapped with Sora
     thumbnail: '',
     description: 'Content & marketing specialist. Compelling copy and multi-platform content.',
     personality: 'Creative, persuasive, energetic',
@@ -86,7 +86,7 @@ export const AVAILABLE_VRM_MODELS: Record<string, VRMModelConfig> = {
  * Get default model (fallback when no intern specified)
  */
 export function getDefaultModel(): VRMModelConfig {
-  return AVAILABLE_VRM_MODELS.mei;
+  return AVAILABLE_VRM_MODELS.sora;
 }
 
 /**

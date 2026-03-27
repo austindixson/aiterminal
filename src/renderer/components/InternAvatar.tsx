@@ -11,13 +11,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentEvent } from '../../agent-loop/events';
 import { getModelForIntern } from '../vrm-models';
-import { VRMModelSelector } from './VRMModelSelector';
 import { getPreloadedVRM } from '../vrm-preloader';
+import { AgentSelector } from './AgentSelector';
+import { applyEmote, createEmote, isEmoteComplete, resetPose, type EmoteState, type EmoteType } from '../vrm-emotes';
+import { ttsLipSyncBridge } from '../vrm-tts-bridge';
 
 // Expression presets from VRM
 type VRMExpression = 'neutral' | 'happy' | 'angry' | 'sad' | 'surprised' | 'joy' | 'sorrow' | 'fun' | 'aa' | 'ih' | 'ou' | 'ee' | 'oh' | 'blink';
 
-// Map agent events to expressions
+// Map agent events to expressions AND emotes
 const EVENT_TO_EXPRESSION: Record<string, VRMExpression> = {
   // Lifecycle events
   'lifecycle:start': 'neutral',
@@ -38,6 +40,23 @@ const EVENT_TO_EXPRESSION: Record<string, VRMExpression> = {
   'error': 'angry'
 };
 
+const EVENT_TO_EMOTE: Record<string, { type: EmoteType; duration?: number }> = {
+  // Lifecycle emotes
+  'lifecycle:start': { type: 'wave', duration: 2000 },           // Wave hello
+  'lifecycle:end': { type: 'wave', duration: 1500 },             // Wave goodbye
+  'lifecycle:error': { type: 'nod-no', duration: 1000 },         // Shake head
+
+  // Tool emotes
+  'tool:start': { type: 'think-pose', duration: 0 },             // Infinite while thinking
+  'tool:end': { type: 'happy-bounce', duration: 1500 },         // Celebrate completion
+
+  // Emotion emotes
+  'assistant:delta': { type: 'idle' },                          // Idle animation while talking
+
+  // Special emotes
+  'handoff': { type: 'clap', duration: 2000 },                   // Celebrate handoff
+};
+
 // Idle animations when intern is waiting
 const IDLE_EXPRESSIONS: VRMExpression[] = ['neutral', 'blink', 'neutral', 'blink'];
 const IDLE_INTERVAL = 3000; // Switch idle expression every 3 seconds
@@ -47,13 +66,29 @@ interface InternAvatarProps {
   isRunning: boolean;
   events: AgentEvent[];
   onInternSelect?: (intern: string) => void;
-  showModelSelector?: boolean;
   // Chat interaction state for expression updates
   isStreaming?: boolean;
   hasInput?: boolean;
+  // Workspace context
+  activeSessionCwd?: string;
+  activeSessionId?: string;
+  // VRM chat toggle
+  showVrmChat?: boolean;
+  onToggleVrmChat?: () => void;
 }
 
-export function InternAvatar({ intern, isRunning, events, onInternSelect, showModelSelector = false, isStreaming = false, hasInput = false }: InternAvatarProps) {
+export function InternAvatar({
+  intern,
+  isRunning,
+  events,
+  onInternSelect,
+  isStreaming = false,
+  hasInput = false,
+  activeSessionCwd,
+  activeSessionId,
+  showVrmChat = false,
+  onToggleVrmChat
+}: InternAvatarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vrmRef = useRef<any>(null);
   const vrmInitializedRef = useRef(false); // Track if VRM is initialized to prevent re-renders
@@ -62,13 +97,39 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
   const [modelLoaded, setModelLoaded] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState(false);
-  const [showSelector, setShowSelector] = useState(false);
+  const [displayedCwd, setDisplayedCwd] = useState<string | undefined>(activeSessionCwd);
+  const [currentEmote, setCurrentEmote] = useState<EmoteState | null>(null);
+  const lipSyncVolumeRef = useRef(0); // Track lip-sync volume for mouth animation
 
   // Use default model if no intern specified
   const currentModel = getModelForIntern(intern);
-  const effectiveIntern = intern || 'mei';
+  const effectiveIntern = intern || 'sora';
 
   console.log(`[InternAvatar] Rendering intern=${effectiveIntern}, isRunning=${isRunning}, vrmInitialized=${vrmInitializedRef.current}`);
+
+  // Reset VRM initialization when switching interns
+  useEffect(() => {
+    console.log(`[InternAvatar] Intern changed to ${effectiveIntern}, resetting VRM init flag`);
+    vrmInitializedRef.current = false;
+    setModelLoaded(false);
+    setModelError(null);
+  }, [effectiveIntern]);
+
+  // Initialize TTS LipSync bridge when component mounts
+  useEffect(() => {
+    // Initialize the lip-sync bridge with a new AudioContext
+    if (!ttsLipSyncBridge['audioContext']) {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      ttsLipSyncBridge.initialize(audioContext);
+      console.log('[InternAvatar] TTS LipSync bridge initialized');
+    }
+
+    // Cleanup on unmount
+    return () => {
+      // Note: Don't dispose here as other components may be using the bridge
+      // The bridge is a singleton that persists across component lifecycles
+    };
+  }, []);
 
   // Initialize Three.js scene and load VRM
   useEffect(() => {
@@ -130,7 +191,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
           0.1,
           20
         );
-        camera.position.set(0, 1.7, 1.0); // Eye level for natural framing
+        camera.position.set(0, 1.7, 1.0); // Default, will auto-adjust to head below
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
@@ -139,7 +200,7 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         container.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.target.set(0, 1.5, 0); // Focus on face level
+        controls.target.set(0, 1.5, 0); // Default, will auto-adjust to head below
         controls.enableZoom = true; // Enable zoom
         controls.enablePan = false; // Pan only with Ctrl+drag
         controls.minDistance = 0.5; // Allow much closer zoom
@@ -188,8 +249,26 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         // Tilt forward 10 degrees for conversational pose
         vrmModel.scene.rotation.y = Math.PI; // Face forward
         vrmModel.scene.rotation.x = -0.17; // Tilt forward ~10° (conversational pose)
-        vrmModel.scene.position.y = 0.25; // Slightly raised for better face framing
+        vrmModel.scene.position.y = 0; // Reset to base, auto-adjust below
         scene.add(vrmModel.scene);
+
+        // Auto-detect head position and adjust camera
+        const headBone = vrmModel.humanoid?.getNormalizedBoneNode('head');
+        let headPosition = new THREE.Vector3(0, 1.5, 0); // Default fallback
+
+        if (headBone) {
+          // Get world position of head bone
+          headBone.getWorldPosition(headPosition, new THREE.Vector3(), new THREE.Quaternion());
+          console.log(`[InternAvatar] Auto-detected head position:`, headPosition);
+        }
+
+        // Position camera relative to detected head position
+        camera.position.set(
+          headPosition.x,
+          headPosition.y,
+          headPosition.z + 1.0  // 1 meter in front of face
+        );
+        controls.target.set(headPosition.x, headPosition.y, headPosition.z);
 
         // ===== FIX T-POSE: Set natural resting pose =====
         // Store resting pose bones to maintain every frame
@@ -268,6 +347,48 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
             vrmModel.update(delta);
             mixer.update(delta); // Update VRM animations
 
+            // ===== LIP SYNC: Update mouth animation during TTS playback =====
+            const lipSyncVolume = ttsLipSyncBridge.update();
+            lipSyncVolumeRef.current = lipSyncVolume;
+
+            // Apply lip-sync volume to VRM mouth expressions
+            // Use a combination of aa/ih/ou/ee for natural mouth movement
+            if (lipSyncVolume > 0.01) {
+              const { expressionManager, VRMExpressionPresetName } = vrmRef.current;
+
+              // Apply volume-based lip animation
+              // Distribute across multiple mouth shapes for natural speech
+              const baseVol = lipSyncVolume;
+
+              // Primary: open mouth (aa) with full volume
+              expressionManager?.setValue(VRMExpressionPresetName.Aa, baseVol * 0.8);
+
+              // Secondary: subtle mouth movements (ih/ou/ee) for variation
+              expressionManager?.setValue(VRMExpressionPresetName.Ih, baseVol * 0.3 * Math.sin(elapsed * 10));
+              expressionManager?.setValue(VRMExpressionPresetName.Ou, baseVol * 0.2 * Math.cos(elapsed * 8));
+              expressionManager?.setValue(VRMExpressionPresetName.Ee, baseVol * 0.2 * Math.sin(elapsed * 12));
+            } else {
+              // Clear lip expressions when not speaking
+              const { expressionManager, VRMExpressionPresetName } = vrmRef.current;
+              expressionManager?.setValue(VRMExpressionPresetName.Aa, 0);
+              expressionManager?.setValue(VRMExpressionPresetName.Ih, 0);
+              expressionManager?.setValue(VRMExpressionPresetName.Ou, 0);
+              expressionManager?.setValue(VRMExpressionPresetName.Ee, 0);
+            }
+
+            // ===== APPLY EMOTE ANIMATIONS =====
+            if (currentEmote) {
+              const emoteElapsed = (Date.now() - currentEmote.startTime) / 1000;
+              applyEmote(vrmModel, currentEmote, emoteElapsed);
+
+              // Check if emote is complete
+              if (isEmoteComplete(currentEmote)) {
+                console.log(`[InternAvatar] Emote complete: ${currentEmote.type}`);
+                resetPose(vrmModel); // Reset to resting pose
+                setCurrentEmote(null); // Clear emote
+              }
+            }
+
             // ===== PROCEDURAL IDLE ANIMATIONS =====
             if (vrmModel.humanoid) {
               // Breathing animation - chest and spine
@@ -294,7 +415,10 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 const currentCursor = cursorPositionRef.current;
 
                 // Get avatar canvas position on screen to calculate relative center
-                const rect = container.getBoundingClientRect();
+                // CRITICAL: Use containerRef.current, not cached container variable!
+                const currentContainer = containerRef.current;
+                if (!currentContainer) return;
+                const rect = currentContainer.getBoundingClientRect();
                 const canvasCenterX = rect.left + rect.width / 2;
                 const canvasCenterY = rect.top + rect.height / 2;
 
@@ -431,9 +555,11 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
         // Handle resize
         const handleResize = () => {
-          camera.aspect = container.clientWidth / container.clientHeight;
+          const currentContainer = containerRef.current;
+          if (!currentContainer) return;
+          camera.aspect = currentContainer.clientWidth / currentContainer.clientHeight;
           camera.updateProjectionMatrix();
-          renderer.setSize(container.clientWidth, container.clientHeight);
+          renderer.setSize(currentContainer.clientWidth, currentContainer.clientHeight);
         };
         window.addEventListener('resize', handleResize);
 
@@ -572,8 +698,26 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
         vrmModel.scene.rotation.y = Math.PI; // Face forward
         vrmModel.scene.rotation.x = -0.17; // Tilt forward ~10° (conversational pose)
-        vrmModel.scene.position.y = 0.25; // Slightly raised for better face framing
+        vrmModel.scene.position.y = 0; // Reset to base, auto-adjust below
         scene.add(vrmModel.scene);
+
+        // Auto-detect head position and adjust camera
+        const headBone = vrmModel.humanoid?.getNormalizedBoneNode('head');
+        let headPosition = new THREE.Vector3(0, 1.5, 0); // Default fallback
+
+        if (headBone) {
+          // Get world position of head bone
+          headBone.getWorldPosition(headPosition, new THREE.Vector3(), new THREE.Quaternion());
+          console.log(`[InternAvatar] Auto-detected head position:`, headPosition);
+        }
+
+        // Position camera relative to detected head position
+        camera.position.set(
+          headPosition.x,
+          headPosition.y,
+          headPosition.z + 1.0  // 1 meter in front of face
+        );
+        controls.target.set(headPosition.x, headPosition.y, headPosition.z);
 
         // ===== FIX T-POSE: Set natural resting pose =====
         // Store resting pose bones to maintain every frame
@@ -650,6 +794,48 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
             vrmModel.update(delta);
             mixer.update(delta); // Update VRM animations
 
+            // ===== LIP SYNC: Update mouth animation during TTS playback =====
+            const lipSyncVolume = ttsLipSyncBridge.update();
+            lipSyncVolumeRef.current = lipSyncVolume;
+
+            // Apply lip-sync volume to VRM mouth expressions
+            // Use a combination of aa/ih/ou/ee for natural mouth movement
+            if (lipSyncVolume > 0.01) {
+              const { expressionManager, VRMExpressionPresetName } = vrmRef.current;
+
+              // Apply volume-based lip animation
+              // Distribute across multiple mouth shapes for natural speech
+              const baseVol = lipSyncVolume;
+
+              // Primary: open mouth (aa) with full volume
+              expressionManager?.setValue(VRMExpressionPresetName.Aa, baseVol * 0.8);
+
+              // Secondary: subtle mouth movements (ih/ou/ee) for variation
+              expressionManager?.setValue(VRMExpressionPresetName.Ih, baseVol * 0.3 * Math.sin(elapsed * 10));
+              expressionManager?.setValue(VRMExpressionPresetName.Ou, baseVol * 0.2 * Math.cos(elapsed * 8));
+              expressionManager?.setValue(VRMExpressionPresetName.Ee, baseVol * 0.2 * Math.sin(elapsed * 12));
+            } else {
+              // Clear lip expressions when not speaking
+              const { expressionManager, VRMExpressionPresetName } = vrmRef.current;
+              expressionManager?.setValue(VRMExpressionPresetName.Aa, 0);
+              expressionManager?.setValue(VRMExpressionPresetName.Ih, 0);
+              expressionManager?.setValue(VRMExpressionPresetName.Ou, 0);
+              expressionManager?.setValue(VRMExpressionPresetName.Ee, 0);
+            }
+
+            // ===== APPLY EMOTE ANIMATIONS =====
+            if (currentEmote) {
+              const emoteElapsed = (Date.now() - currentEmote.startTime) / 1000;
+              applyEmote(vrmModel, currentEmote, emoteElapsed);
+
+              // Check if emote is complete
+              if (isEmoteComplete(currentEmote)) {
+                console.log(`[InternAvatar] Emote complete: ${currentEmote.type}`);
+                resetPose(vrmModel); // Reset to resting pose
+                setCurrentEmote(null); // Clear emote
+              }
+            }
+
             // ===== PROCEDURAL IDLE ANIMATIONS =====
             if (vrmModel.humanoid) {
               // Breathing animation - chest and spine
@@ -676,7 +862,10 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
                 const currentCursor = cursorPositionRef.current;
 
                 // Get avatar canvas position on screen to calculate relative center
-                const rect = container.getBoundingClientRect();
+                // CRITICAL: Use containerRef.current, not cached container variable!
+                const currentContainer = containerRef.current;
+                if (!currentContainer) return;
+                const rect = currentContainer.getBoundingClientRect();
                 const canvasCenterX = rect.left + rect.width / 2;
                 const canvasCenterY = rect.top + rect.height / 2;
 
@@ -813,9 +1002,11 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
         // Handle resize
         const handleResize = () => {
-          camera.aspect = container.clientWidth / container.clientHeight;
+          const currentContainer = containerRef.current;
+          if (!currentContainer) return;
+          camera.aspect = currentContainer.clientWidth / currentContainer.clientHeight;
           camera.updateProjectionMatrix();
-          renderer.setSize(container.clientWidth, container.clientHeight);
+          renderer.setSize(currentContainer.clientWidth, currentContainer.clientHeight);
         };
         window.addEventListener('resize', handleResize);
 
@@ -912,7 +1103,35 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
   }, [events, isRunning, isStreaming]);
 
-  // Update expression based on chat interactions (typing, streaming)
+  // Trigger emotes based on agent events
+  useEffect(() => {
+    if (!vrmRef.current || events.length === 0) return;
+
+    const latestEvent = events[events.length - 1];
+    if (!latestEvent) return;
+
+    // Get emote config for this event
+    let eventKey = latestEvent.stream;
+
+    // Safely access event data properties
+    if (latestEvent.data && typeof latestEvent.data === 'object') {
+      const data = latestEvent.data as any;
+      if (data.phase) eventKey += `:${data.phase}`;
+      else if (data.status) eventKey += `:${data.status}`;
+    }
+
+    const emoteConfig = EVENT_TO_EMOTE[eventKey] ||
+                        EVENT_TO_EMOTE[latestEvent.stream];
+
+    if (emoteConfig) {
+      console.log(`[InternAvatar] Triggering emote: ${emoteConfig.type}`);
+      const newEmote = createEmote(emoteConfig.type, emoteConfig.duration);
+      setCurrentEmote(newEmote);
+    }
+
+  }, [events]);
+
+  // Apply active emote in animation loop
   useEffect(() => {
     if (!vrmRef.current) return;
 
@@ -944,6 +1163,42 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
   }, [isStreaming, hasInput, isRunning]);
 
+  // Subscribe to CWD changes for active session
+  useEffect(() => {
+    if (!activeSessionId) return;
+
+    const hasElectronAPI =
+      typeof window !== 'undefined' &&
+      'electronAPI' in window &&
+      window.electronAPI?.onSessionCwdChanged;
+
+    if (!hasElectronAPI) return;
+
+    // Update displayed CWD when prop changes
+    if (activeSessionCwd) {
+      setDisplayedCwd(activeSessionCwd);
+    }
+
+    // Listen for real-time CWD changes
+    const unsubscribe = window.electronAPI.onSessionCwdChanged?.(({ sessionId, cwd }) => {
+      if (sessionId === activeSessionId) {
+        setDisplayedCwd(cwd);
+      }
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [activeSessionId, activeSessionCwd]);
+
+  // Helper to shorten path for display
+  const shortenPath = (path: string | undefined): string | undefined => {
+    if (!path) return undefined;
+    const parts = path.split('/');
+    const lastPart = parts[parts.length - 1];
+    return lastPart || path;
+  };
+
   if (!intern) {
     return (
       <div className="intern-avatar offline">
@@ -958,34 +1213,54 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
 
   return (
     <div className="intern-avatar">
-      {/* Header with model info and settings button */}
+      {/* Header with model info and agent selector */}
       <div
         className="avatar-header"
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
       >
         <div className="avatar-info">
-          <span className="intern-emoji">{currentModel.emoji}</span>
-          <span className="intern-name" style={{ color: currentModel.color }}>
-            {currentModel.displayName}
-          </span>
+          {onInternSelect ? (
+            <AgentSelector
+              selectedIntern={intern}
+              onSelectIntern={onInternSelect}
+            />
+          ) : (
+            <>
+              <span className="intern-emoji">{currentModel.emoji}</span>
+              <span className="intern-name" style={{ color: currentModel.color }}>
+                {currentModel.displayName}
+              </span>
+            </>
+          )}
         </div>
         <div className="avatar-controls">
+          {onToggleVrmChat && (
+            <button
+              className={`chat-toggle ${showVrmChat ? 'active' : ''}`}
+              onClick={onToggleVrmChat}
+              title={showVrmChat ? 'Hide chat' : 'Show chat'}
+            >
+              💬
+            </button>
+          )}
           <span className={`status-indicator ${isRunning ? 'running' : 'idle'}`}>
             {isRunning ? '● Working' : '○ Idle'}
           </span>
-          {showModelSelector && (
-            <button
-              className="avatar-settings-btn"
-              onClick={() => setShowSelector(true)}
-              title="Change Avatar Model"
-              aria-label="Change Avatar Model"
-            >
-              ⚙️
-            </button>
-          )}
         </div>
       </div>
+
+      {/* Workspace Context Display */}
+      {displayedCwd && (
+        <div className="avatar-context">
+          <div className="context-cwd">
+            <span className="context-icon">📁</span>
+            <span className="context-path" title={displayedCwd}>
+              {shortenPath(displayedCwd)}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Tooltip */}
       {showTooltip && (
@@ -1007,13 +1282,6 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         key={`vrm-canvas-${effectiveIntern}`}
         ref={containerRef}
         className="vrm-canvas-container"
-        style={{
-          width: '100%',
-          height: '300px',
-          position: 'relative',
-          borderRadius: '12px',
-          overflow: 'hidden'
-        }}
       >
         <div className="loading-overlay" style={{
           position: 'absolute',
@@ -1057,20 +1325,6 @@ export function InternAvatar({ intern, isRunning, events, onInternSelect, showMo
         <span className="expression-label">Expression:</span>
         <span className="expression-value">{currentExpression}</span>
       </div>
-
-      {/* Model Selector Modal */}
-      {showSelector && (
-        <VRMModelSelector
-          selectedIntern={intern}
-          onSelectIntern={(newIntern) => {
-            if (onInternSelect) {
-              onInternSelect(newIntern);
-            }
-            setShowSelector(false);
-          }}
-          onClose={() => setShowSelector(false)}
-        />
-      )}
     </div>
   );
 }

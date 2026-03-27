@@ -98,6 +98,11 @@ async function preloadVRM(
 
   preloadPromises[modelId] = (async () => {
     try {
+      // Check if document is ready
+      if (!document || !document.body) {
+        throw new Error('Document not ready');
+      }
+
       // Create offscreen canvas for loading (don't attach to DOM)
       const offscreenCanvas = document.createElement('canvas');
       const offscreenContainer = document.createElement('div');
