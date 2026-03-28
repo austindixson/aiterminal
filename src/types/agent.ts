@@ -9,7 +9,7 @@
 
 export interface FileOperation {
   readonly id: string
-  readonly type: 'create' | 'edit' | 'delete'
+  readonly type: 'create' | 'edit' | 'delete' | 'read'
   readonly filePath: string
   readonly content?: string          // new content (create/edit)
   readonly originalContent?: string  // for showing diffs (edit)

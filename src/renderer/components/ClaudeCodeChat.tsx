@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { InlineFileOpsApproval } from './InlineFileOpsApproval';
+import type { FileOperation } from '../../types/agent';
 import '../styles/components.css';
 
 interface ClaudeCodeChatProps {
@@ -17,6 +19,9 @@ interface ClaudeCodeChatProps {
   isWaitingForPermissions?: boolean;
   placeholder?: string;
   onClose?: () => void;
+  pendingFileOps?: ReadonlyArray<FileOperation>;
+  onApproveFileOps?: () => void;
+  onRejectFileOps?: () => void;
 }
 
 /**
@@ -37,7 +42,10 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
   terminalVisible = true,
   isWaitingForPermissions = false,
   placeholder = 'Type a message...',
-  onClose
+  onClose,
+  pendingFileOps = [],
+  onApproveFileOps,
+  onRejectFileOps,
 }) => {
   const [input, setInput] = useState('');
   const [isMultiline, setIsMultiline] = useState(false);
@@ -262,6 +270,14 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
               </div>
             </div>
           </div>
+        )}
+        {/* File operation approval widget */}
+        {pendingFileOps.length > 0 && onApproveFileOps && onRejectFileOps && (
+          <InlineFileOpsApproval
+            operations={pendingFileOps}
+            onApprove={onApproveFileOps}
+            onReject={onRejectFileOps}
+          />
         )}
         <div ref={messagesEndRef} />
       </div>

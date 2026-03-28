@@ -47,29 +47,64 @@ const DEV_SERVER_URL = 'http://localhost:5173';
 const RENDERER_PATH = join(__dirname, '../../renderer/index.html');
 
 // ---------------------------------------------------------------------------
+// Project tree formatting for AI context
+// ---------------------------------------------------------------------------
+
+interface TreeEntry {
+  readonly name: string;
+  readonly isDirectory: boolean;
+  readonly children?: ReadonlyArray<TreeEntry>;
+}
+
+function formatTreeForPrompt(entries: ReadonlyArray<TreeEntry>, indent: string = ''): string {
+  const lines: string[] = [];
+  for (const entry of entries) {
+    const prefix = entry.isDirectory ? `${entry.name}/` : entry.name;
+    lines.push(`${indent}${prefix}`);
+    if (entry.isDirectory && entry.children) {
+      lines.push(formatTreeForPrompt(entry.children, indent + '  '));
+    }
+  }
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // AI client configuration
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are AITerminal, an AI assistant embedded in a terminal emulator on macOS (zsh).
+const SYSTEM_PROMPT = `You are AITerminal, an AI coding assistant embedded in a terminal emulator. You can execute commands, read files, create files, and edit files — just like Cursor or Claude Code.
 
-CRITICAL RULE: When the user's intent maps to a shell command, you MUST auto-execute it.
-Wrap any command you want to run in [RUN]command[/RUN] tags. The terminal will execute it automatically.
+SHELL COMMANDS:
+Wrap commands in [RUN]command[/RUN] tags for automatic execution.
+Examples: [RUN]cd ~/Desktop[/RUN], [RUN]ls -la[/RUN], [RUN]npm install express[/RUN]
+Chain related commands: [RUN]mkdir -p ~/projects && cd ~/projects[/RUN]
+For DESTRUCTIVE commands (rm, kill, drop), explain first — do NOT auto-execute.
 
-CHAINING RULE: When creating a directory, always cd into it too. When an action has a logical follow-up, chain them.
+FILE OPERATIONS:
+You can create, edit, read, and delete files directly.
 
-Examples:
-- User: "take me to desktop" → [RUN]cd ~/Desktop[/RUN]
-- User: "show my files" → [RUN]ls -la[/RUN]
-- User: "what's my ip" → [RUN]curl -s ifconfig.me[/RUN]
-- User: "make a folder called projects" → [RUN]mkdir -p ~/projects && cd ~/projects[/RUN]
-- User: "create a new react app called myapp" → [RUN]npx create-react-app myapp && cd myapp[/RUN]
-- User: "clone this repo" → [RUN]git clone <url> && cd <repo-name>[/RUN]
+Create a new file:
+[FILE:path/to/file.ts]
+file content here
+[/FILE]
 
-For DESTRUCTIVE commands (rm, kill, drop, etc.), do NOT auto-execute. Instead explain and let the user decide.
+Edit an existing file (provide complete updated content):
+[EDIT:path/to/file.ts]
+updated content here
+[/EDIT]
 
-For questions/explanations that don't need a command, just respond naturally without [RUN] tags.
+Read a file to understand its contents:
+[READ:path/to/file.ts]
 
-Keep responses brief and helpful. Always finish your sentences.`;
+Delete a file:
+[DELETE:path/to/file.ts]
+
+GUIDELINES:
+- Use file operations proactively when the user asks you to build, fix, or modify code
+- Always read relevant files before editing them
+- When creating projects, create all necessary files (package.json, src/, etc.)
+- The user can also attach files with @filename for you to reference
+- Keep responses brief and helpful. Always finish your sentences.`;
 
 function createAIClient(): OpenRouterClient | null {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -203,16 +238,35 @@ app.whenReady().then(() => {
   const sessionManager = new TerminalSessionManager(window);
   sessionManagerRef.current = sessionManager;
 
-  // Agent mode: update system prompt with intern identity
-  ipcMain.handle('update-intern-system-prompt', async (_event, activeIntern: string | null) => {
+  // Agent mode: update system prompt with intern identity + project context
+  ipcMain.handle('update-intern-system-prompt', async (_event, payload: string | null | { intern: string | null; cwd?: string }) => {
     if (!aiClient) {
       return { success: false, error: 'AI client not initialized' };
     }
 
     try {
-      const newPrompt = buildInternSystemPrompt(activeIntern);
-      aiClient.setSystemPrompt(newPrompt);
-      console.log('[main] Updated system prompt for intern:', activeIntern);
+      // Backward-compatible: accept plain string or { intern, cwd }
+      const activeIntern = typeof payload === 'string' || payload === null
+        ? payload
+        : payload.intern;
+      const cwd = typeof payload === 'object' && payload !== null ? payload.cwd : undefined;
+
+      let basePrompt = buildInternSystemPrompt(activeIntern);
+
+      // Inject project context if CWD is provided
+      if (cwd) {
+        try {
+          const { readDirectoryTree: readTree } = await import('../file-tree/file-tree-service.js');
+          const tree = await readTree(cwd, 2);
+          const treeStr = formatTreeForPrompt(tree as ReadonlyArray<TreeEntry>);
+          basePrompt += `\n\nWORKING DIRECTORY: ${cwd}\nPROJECT STRUCTURE:\n${treeStr}`;
+        } catch {
+          basePrompt += `\n\nWORKING DIRECTORY: ${cwd}`;
+        }
+      }
+
+      aiClient.setSystemPrompt(basePrompt);
+      console.log('[main] Updated system prompt for intern:', activeIntern, cwd ? `(cwd: ${cwd})` : '');
       return { success: true };
     } catch (error) {
       console.error('[main] Failed to update system prompt:', error);

@@ -223,7 +223,7 @@ export interface ElectronAPI {
   onAgentError: (callback: (data: { runId: string; error: string }) => void) => () => void;
 
   // --- Agent mode: update system prompt with intern identity ---
-  updateInternSystemPrompt: (activeIntern: string | null) => Promise<{
+  updateInternSystemPrompt: (payload: string | null | { intern: string | null; cwd?: string }) => Promise<{
     success: boolean;
     error?: string;
   }>;

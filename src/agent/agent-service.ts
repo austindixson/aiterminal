@@ -84,6 +84,22 @@ export function parseAgentResponse(
     })
   }
 
+  // Parse [READ:path] tags (AI requesting to read a file)
+  const readRegex = /\[READ:([^\]]+)\]/g
+
+  while ((match = readRegex.exec(aiContent)) !== null) {
+    const filePath = match[1].trim()
+    if (filePath.length === 0) continue
+
+    operations.push({
+      id: generateId('op'),
+      type: 'read',
+      filePath,
+      description: `Read ${filePath}`,
+      status: 'pending',
+    })
+  }
+
   // Parse [DELETE:path] tags
   const deleteRegex = /\[DELETE:([^\]]+)\]/g
 
@@ -241,6 +257,12 @@ export async function applyOperation(
       case 'delete':
         await api.deleteFile(op.filePath)
         return { success: true }
+
+      case 'read': {
+        const result = await api.readFile(op.filePath)
+        if (result.error) return { success: false, error: result.error }
+        return { success: true }
+      }
 
       default:
         return { success: false, error: `Unknown operation type: ${(op as FileOperation).type}` }

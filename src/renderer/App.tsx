@@ -244,6 +244,18 @@ export const App: FC = () => {
     }
   }, [backendSelector.claudeCodeStream, backendSelector.activeBackend, claudeCodeComments])
 
+  // Update AI system prompt with project context when CWD changes
+  useEffect(() => {
+    if (chat.state.isOpen && activeTabCwd) {
+      const api = window.electronAPI
+      if (api?.updateInternSystemPrompt) {
+        const agentState = (window as any).agentLoopState
+        const activeIntern = agentState?.activeIntern || 'sora'
+        api.updateInternSystemPrompt({ intern: activeIntern, cwd: activeTabCwd }).catch(() => {})
+      }
+    }
+  }, [activeTabCwd, chat.state.isOpen])
+
   const fileTree = useFileTree(activeTabCwd)
   const filePicker = useFilePicker(activeTabCwd)
 
@@ -939,6 +951,9 @@ export const App: FC = () => {
                   role: m.role as 'user' | 'assistant',
                   content: m.content
                 }))}
+                pendingFileOps={chat.pendingFileOps}
+                onApproveFileOps={chat.approveFileOps}
+                onRejectFileOps={chat.rejectFileOps}
                 onSendMessage={async (text) => {
                   await chat.sendMessage(text)
                 }}

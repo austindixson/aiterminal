@@ -293,9 +293,9 @@ const electronAPI: ElectronAPI = {
     };
   },
 
-  // --- Agent mode: update system prompt with intern identity ---
-  updateInternSystemPrompt: (activeIntern: string | null) =>
-    ipcRenderer.invoke('update-intern-system-prompt', activeIntern),
+  // --- Agent mode: update system prompt with intern identity + project context ---
+  updateInternSystemPrompt: (payload: string | null | { intern: string | null; cwd?: string }) =>
+    ipcRenderer.invoke('update-intern-system-prompt', payload),
 
   // --- Transcript search and retrieval ---
   transcriptSearch: (query: string, limit?: number) =>

@@ -9,6 +9,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { MODELS } from '@/ai/models'
 import type { ChatMessage, ChatState, FileAttachment } from '@/types/chat'
+import type { FileOperation } from '@/types/agent'
+import { parseAgentResponse, applyOperation } from '@/agent/agent-service'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -70,6 +72,32 @@ function clampAvatarHeight(height: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// File operation tag parsing
+// ---------------------------------------------------------------------------
+
+function extractFileOps(raw: string): { text: string; operations: ReadonlyArray<FileOperation> } {
+  const operations = parseAgentResponse(raw)
+  if (operations.length === 0) return { text: raw, operations: [] }
+
+  // Strip raw tags from display text
+  let text = raw
+    .replace(/\[FILE:[^\]]+\][\s\S]*?\[\/FILE\]/g, '')
+    .replace(/\[EDIT:[^\]]+\][\s\S]*?\[\/EDIT\]/g, '')
+    .replace(/\[DELETE:[^\]]+\]/g, '')
+    .replace(/\[READ:[^\]]+\]/g, '')
+    .trim()
+
+  // Add operation summary
+  const writeOps = operations.filter(op => op.type !== 'read')
+  if (writeOps.length > 0) {
+    const summary = writeOps.map(op => `\`${op.type}\` ${op.filePath}`).join(', ')
+    text = text ? `${text}\n\n**Proposed:** ${summary}` : `**Proposed:** ${summary}`
+  }
+
+  return { text, operations }
+}
+
+// ---------------------------------------------------------------------------
 // @mention regex
 // ---------------------------------------------------------------------------
 
@@ -97,6 +125,9 @@ export interface UseChatReturn {
   readonly setInputValue: (value: string) => void
   readonly extractMentions: (text: string) => readonly string[]
   readonly injectFromTerminal: (userInput: string) => Promise<void>
+  readonly pendingFileOps: ReadonlyArray<FileOperation>
+  readonly approveFileOps: () => Promise<void>
+  readonly rejectFileOps: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +145,7 @@ export function useChat(): UseChatReturn {
   const [activeModelLabel, setActiveModelLabel] = useState<string | undefined>(undefined)
   const [activeModelId, setActiveModelId] = useState<string | undefined>(undefined)
   const [activePresetLabel, setActivePresetLabel] = useState<string | undefined>(undefined)
+  const [pendingFileOps, setPendingFileOps] = useState<ReadonlyArray<FileOperation>>([])
 
   const refreshActiveAiModel = useCallback(async () => {
     const api = window.electronAPI
@@ -321,12 +353,40 @@ export function useChat(): UseChatReturn {
               },
             )
 
-            const finalContent = applyRunTags(accumulated)
+            const afterRunTags = applyRunTags(accumulated)
+            const { text: finalContent, operations } = extractFileOps(afterRunTags)
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === placeholderId ? { ...m, content: finalContent } : m,
               ),
             )
+
+            // Handle file operations
+            if (operations.length > 0) {
+              // Auto-handle [READ:] tags — fetch file and inject into context
+              const readOps = operations.filter(op => op.type === 'read')
+              const writeOps = operations.filter(op => op.type !== 'read')
+
+              for (const readOp of readOps) {
+                try {
+                  const result = await window.electronAPI.readFile(readOp.filePath)
+                  if (result.content) {
+                    // Inject file content as a system-ish context message
+                    const fileMsg = createAssistantMessage(
+                      `📄 **${readOp.filePath}**\n\`\`\`\n${result.content.slice(0, 5000)}\n\`\`\``,
+                    )
+                    setMessages((prev) => [...prev, fileMsg].slice(-MAX_MESSAGES))
+                  }
+                } catch {
+                  /* ignore read errors */
+                }
+              }
+
+              // Store write/edit/delete ops for approval
+              if (writeOps.length > 0) {
+                setPendingFileOps(writeOps)
+              }
+            }
           } else {
             const response = await api.aiQuery({
               prompt: fullPrompt,
@@ -407,6 +467,30 @@ export function useChat(): UseChatReturn {
   )
 
   // -------------------------------------------------------------------------
+  // File operation approval
+  // -------------------------------------------------------------------------
+
+  const approveFileOps = useCallback(async () => {
+    const ops = pendingFileOps
+    setPendingFileOps([])
+    const results: string[] = []
+    for (const op of ops) {
+      const result = await applyOperation(op)
+      results.push(result.success
+        ? `✅ ${op.type} ${op.filePath}`
+        : `❌ ${op.type} ${op.filePath}: ${result.error}`)
+    }
+    const summaryMsg = createAssistantMessage(results.join('\n'))
+    setMessages((prev) => [...prev, summaryMsg].slice(-MAX_MESSAGES))
+  }, [pendingFileOps])
+
+  const rejectFileOps = useCallback(() => {
+    setPendingFileOps([])
+    const msg = createAssistantMessage('File operations dismissed.')
+    setMessages((prev) => [...prev, msg].slice(-MAX_MESSAGES))
+  }, [])
+
+  // -------------------------------------------------------------------------
   // Inject from terminal — auto-opens chat and sends a message
   // Used when terminal detects natural language or errors
   // -------------------------------------------------------------------------
@@ -421,15 +505,13 @@ export function useChat(): UseChatReturn {
     [sendMessage, isStreaming, refreshActiveAiModel],
   )
 
-  // Update system prompt when chat opens - always use active intern
+  // Update system prompt when chat opens
   useEffect(() => {
     if (isOpen) {
       const api = window.electronAPI
       if (api?.updateInternSystemPrompt) {
-        // Get active intern from global agent state, default to sora
         const agentState = (window as any).agentLoopState
         const activeIntern = agentState?.activeIntern || 'sora'
-        console.log('[useChat] Chat opened, updating system prompt for intern:', activeIntern)
         api.updateInternSystemPrompt(activeIntern).catch((err) => {
           console.error('[useChat] Failed to update system prompt:', err)
         })
@@ -471,5 +553,8 @@ export function useChat(): UseChatReturn {
     setInputValue,
     extractMentions,
     injectFromTerminal,
+    pendingFileOps,
+    approveFileOps,
+    rejectFileOps,
   }
 }
