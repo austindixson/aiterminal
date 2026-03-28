@@ -84,10 +84,17 @@ export function useBackendSelector(
   onBackendChange?: (backend: 'openrouter' | 'claude-code') => void
 ): UseBackendSelectorReturn {
   const [activeBackend, setActiveBackend] = useState<'openrouter' | 'claude-code'>('openrouter');
+  const activeBackendRef = useRef<'openrouter' | 'claude-code'>('openrouter');
   const [isClaudeCodeAvailable, setIsClaudeCodeAvailable] = useState(false);
   const [isClaudeCodeRunning, setIsClaudeCodeRunning] = useState(false);
   const [claudeCodeStream, setClaudeCodeStream] = useState('');
   const isWaitingForPermissionsRef = useRef(false);
+
+  /** Set backend in both state (for React) and ref (for event listeners) */
+  const setBackend = useCallback((backend: 'openrouter' | 'claude-code') => {
+    activeBackendRef.current = backend;
+    setActiveBackend(backend);
+  }, []);
 
   // Track the Claude Code session ID for PTY writing
   const claudeCodeSessionIdRef = useRef<string | null>(null);
@@ -129,7 +136,7 @@ export function useBackendSelector(
 
       if (success) {
         setIsClaudeCodeRunning(true);
-        setActiveBackend('claude-code');
+        setBackend('claude-code');
         onBackendChange?.('claude-code');
         console.log('[useBackendSelector] Claude Code spawned successfully');
       } else {
@@ -161,7 +168,7 @@ export function useBackendSelector(
       console.log('[useBackendSelector] Killing Claude Code');
       window.electronAPI.claudeCodeKill?.();
       setIsClaudeCodeRunning(false);
-      setActiveBackend('openrouter');
+      setBackend('openrouter');
       setClaudeCodeStream('');
       onBackendChange?.('openrouter');
     } catch (error) {
@@ -266,13 +273,10 @@ export function useBackendSelector(
 
       if (tuiEnterPattern.test(text)) {
         console.log('[useBackendSelector] ✅ TUI pattern detected! Claude Code entered in session', sessionId);
-        // Store the session ID for later PTY writes
         claudeCodeSessionIdRef.current = sessionId;
-        console.log('[useBackendSelector] 🔄 Updated claudeCodeSessionIdRef to:', sessionId);
-        // Switch backend to Claude Code mode (process is already running in PTY)
-        if (activeBackend !== 'claude-code') {
+        if (activeBackendRef.current !== 'claude-code') {
           console.log('[useBackendSelector] Switching backend to claude-code');
-          setActiveBackend('claude-code');
+          setBackend('claude-code');
           setIsClaudeCodeRunning(true);
           setClaudeCodeStream(''); // Clear previous stream
           onBackendChange?.('claude-code');
@@ -296,12 +300,10 @@ export function useBackendSelector(
             }, 150);
           });
         }
-      } else if (claudeCodePattern.test(text) && activeBackend !== 'claude-code') {
-        // Fallback: detect Claude Code by text content
+      } else if (claudeCodePattern.test(text) && activeBackendRef.current !== 'claude-code') {
         console.log('[useBackendSelector] ✅ Claude Code detected by text pattern in session', sessionId);
-        // Store the session ID
         claudeCodeSessionIdRef.current = sessionId;
-        setActiveBackend('claude-code');
+        setBackend('claude-code');
         setIsClaudeCodeRunning(true);
         setClaudeCodeStream('');
         onBackendChange?.('claude-code');
@@ -326,15 +328,12 @@ export function useBackendSelector(
 
       // Check for Claude Code TUI exit (alternative screen buffer off)
       const tuiExitPattern = /\x1b\[\?1049l/;
-      if (tuiExitPattern.test(text)) {
+      if (tuiExitPattern.test(text) && activeBackendRef.current === 'claude-code') {
         console.log('[useBackendSelector] Claude Code TUI exited from session', sessionId);
-        // Switch back to OpenRouter
-        if (activeBackend === 'claude-code') {
-          setActiveBackend('openrouter');
-          setIsClaudeCodeRunning(false);
-          setClaudeCodeStream('');
-          onBackendChange?.('openrouter');
-        }
+        setBackend('openrouter');
+        setIsClaudeCodeRunning(false);
+        setClaudeCodeStream('');
+        onBackendChange?.('openrouter');
       }
     }) || window.electronAPI.onPtyData?.((data) => {
       const text = typeof data === 'string' ? data : String(data);
@@ -345,8 +344,8 @@ export function useBackendSelector(
 
       if (tuiEnterPattern.test(text)) {
         console.log('[useBackendSelector] Claude Code TUI entered (legacy)');
-        if (activeBackend !== 'claude-code') {
-          setActiveBackend('claude-code');
+        if (activeBackendRef.current !== 'claude-code') {
+          setBackend('claude-code');
           setIsClaudeCodeRunning(true);
           setClaudeCodeStream('');
           onBackendChange?.('claude-code');
@@ -369,10 +368,9 @@ export function useBackendSelector(
             }, 150);
           });
         }
-      } else if (claudeCodePattern.test(text) && activeBackend !== 'claude-code') {
-        // Fallback: detect Claude Code by text content
+      } else if (claudeCodePattern.test(text) && activeBackendRef.current !== 'claude-code') {
         console.log('[useBackendSelector] Claude Code detected by text pattern (legacy)');
-        setActiveBackend('claude-code');
+        setBackend('claude-code');
         setIsClaudeCodeRunning(true);
         setClaudeCodeStream('');
         onBackendChange?.('claude-code');
@@ -396,14 +394,12 @@ export function useBackendSelector(
       }
 
       const tuiExitPattern = /\x1b\[\?1049l/;
-      if (tuiExitPattern.test(text)) {
+      if (tuiExitPattern.test(text) && activeBackendRef.current === 'claude-code') {
         console.log('[useBackendSelector] Claude Code TUI exited (legacy)');
-        if (activeBackend === 'claude-code') {
-          setActiveBackend('openrouter');
-          setIsClaudeCodeRunning(false);
-          setClaudeCodeStream('');
-          onBackendChange?.('openrouter');
-        }
+        setBackend('openrouter');
+        setIsClaudeCodeRunning(false);
+        setClaudeCodeStream('');
+        onBackendChange?.('openrouter');
       }
     });
 
@@ -413,7 +409,7 @@ export function useBackendSelector(
         clearTimeout(detectionTimeoutRef.current);
       }
     };
-  }, [checkClaudeCodeAvailability, activeBackend, onBackendChange]);
+  }, [checkClaudeCodeAvailability, onBackendChange, setBackend]);
 
   /**
    * Listen to Claude Code process events
@@ -439,7 +435,7 @@ export function useBackendSelector(
     const unsubscribeClose = window.electronAPI.onClaudeCodeClose?.((code) => {
       console.log('[useBackendSelector] Claude Code closed with code:', code);
       setIsClaudeCodeRunning(false);
-      setActiveBackend('openrouter');
+      setBackend('openrouter');
       setClaudeCodeStream('');
       onBackendChange?.('openrouter');
     });

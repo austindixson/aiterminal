@@ -170,6 +170,14 @@ export const App: FC = () => {
     tuiModeRef.current = tuiMode
   }, [tuiMode])
 
+  // Reset TUI mode when Claude Code exits
+  useEffect(() => {
+    if (backendSelector.activeBackend === 'openrouter' && tuiMode) {
+      tuiModeRef.current = false
+      setTuiMode(false)
+    }
+  }, [backendSelector.activeBackend, tuiMode])
+
   // Active terminal session cwd (file tree + picker); derived from active tab
   const activeTabCwd = useMemo(() => {
     const activeTab = terminalTabs.state.tabs.find(t => t.isActive)
