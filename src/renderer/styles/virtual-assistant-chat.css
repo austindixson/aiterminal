@@ -5,12 +5,15 @@
 
 .virtual-assistant-chat {
   position: absolute;
-  inset: 0;
+  top: 50px; /* Below the avatar-header bar */
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   background: transparent;
   pointer-events: none; /* Let clicks pass through to VRM model */
-  z-index: 10; /* Above speech bubbles */
+  z-index: 5; /* Below avatar-header (z-index: 20+) */
 }
 
 .virtual-assistant-chat__messages {

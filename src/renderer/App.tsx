@@ -1006,28 +1006,27 @@ export const App: FC = () => {
                   activeSessionCwd={activeTabCwd}
                   activeSessionId={terminalTabs.state.activeTabId ?? undefined}
                   showVrmChat={showVrmChat}
-                  onToggleVrmChat={() => setShowVrmChat(!showVrmChat)}
+                  onToggleVrmChat={() => setShowVrmChat(prev => !prev)}
                 />
+
+                {/* Speech Bubbles - floating overlay */}
+                <SpeechBubbles
+                  messages={speechBubbles.bubbles}
+                  onRemove={speechBubbles.removeBubble}
+                />
+
+                {/* Virtual Assistant Chat - transparent overlay inside avatar container */}
+                {showVrmChat && (
+                  <VirtualAssistantChat
+                    messages={[...chat.state.messages]}
+                    onSendMessage={async (msg) => {
+                      await chat.sendMessage(msg)
+                      speechBubbles.addBubble(msg)
+                    }}
+                    isStreaming={chat.state.isStreaming}
+                  />
+                )}
               </div>
-
-              {/* Speech Bubbles - floating overlay */}
-              <SpeechBubbles
-                messages={speechBubbles.bubbles}
-                onRemove={speechBubbles.removeBubble}
-              />
-
-              {/* Virtual Assistant Chat - transparent overlay */}
-              {showVrmChat && chat.state.isOpen && (
-                <VirtualAssistantChat
-                  messages={[...chat.state.messages]}
-                  onSendMessage={async (msg) => {
-                    await chat.sendMessage(msg)
-                    // Add user message as speech bubble
-                    speechBubbles.addBubble(msg)
-                  }}
-                  isStreaming={chat.state.isStreaming}
-                />
-              )}
             </div>
           </>
         )}
