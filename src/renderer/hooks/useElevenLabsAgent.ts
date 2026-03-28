@@ -56,11 +56,8 @@ export function useElevenLabsAgent(): UseElevenLabsAgentReturn {
           text: msg.message!,
           timestamp: Date.now(),
         }]);
-
-        // Dispatch TTS event for lip sync when agent speaks
-        if (msg.source === 'ai') {
-          window.dispatchEvent(new CustomEvent('ai-response', { detail: msg.message }));
-        }
+        // Note: do NOT dispatch ai-response event here — the ElevenLabs agent
+        // handles its own audio output. Dispatching would cause double playback.
       }
     },
     onError: (error) => {
