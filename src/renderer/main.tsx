@@ -10,6 +10,7 @@
 
 import { createRoot } from "react-dom/client";
 import "@xterm/xterm/css/xterm.css";
+import { ConversationProvider } from "@elevenlabs/react";
 import { App } from "./App";
 import "./styles/global.css";
 import "./styles/components.css";
@@ -46,7 +47,11 @@ if (!rootElement) {
 // Add error boundary to catch React initialization errors
 try {
   // No StrictMode — it double-mounts in dev, creating duplicate xterm instances
-  createRoot(rootElement).render(<App />);
+  createRoot(rootElement).render(
+    <ConversationProvider>
+      <App />
+    </ConversationProvider>
+  );
 } catch (error) {
   console.error('[main] Failed to render React app:', error);
   // Show error on screen for debugging
