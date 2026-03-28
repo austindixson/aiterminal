@@ -8,7 +8,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { MODELS } from '@/ai/models'
-import type { ChatMessage, ChatState, FileAttachment } from '@/types/chat'
+import type { ChatMessage, ChatMode, ChatState, FileAttachment } from '@/types/chat'
 import type { FileOperation } from '@/types/agent'
 import { parseAgentResponse, applyOperation } from '@/agent/agent-service'
 
@@ -128,6 +128,7 @@ export interface UseChatReturn {
   readonly pendingFileOps: ReadonlyArray<FileOperation>
   readonly approveFileOps: () => Promise<void>
   readonly rejectFileOps: () => void
+  readonly cycleChatMode: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -146,6 +147,15 @@ export function useChat(): UseChatReturn {
   const [activeModelId, setActiveModelId] = useState<string | undefined>(undefined)
   const [activePresetLabel, setActivePresetLabel] = useState<string | undefined>(undefined)
   const [pendingFileOps, setPendingFileOps] = useState<ReadonlyArray<FileOperation>>([])
+  const [chatMode, setChatMode] = useState<ChatMode>('normal')
+
+  const cycleChatMode = useCallback(() => {
+    setChatMode(prev => {
+      const modes: ChatMode[] = ['normal', 'plan', 'autocode']
+      const idx = modes.indexOf(prev)
+      return modes[(idx + 1) % modes.length]
+    })
+  }, [])
 
   const refreshActiveAiModel = useCallback(async () => {
     const api = window.electronAPI
@@ -244,9 +254,14 @@ export function useChat(): UseChatReturn {
         .map((f) => `[File: ${f.name}]\n${f.content}`)
         .join('\n\n')
 
-      const fullPrompt = fileContext
+      // Apply mode prefix
+      const modePrefix = chatMode === 'plan'
+        ? '[PLAN MODE] Describe what changes you would make and why, but do NOT use [FILE], [EDIT], or [DELETE] tags. Only analyze and explain your plan.\n\n'
+        : ''
+
+      const fullPrompt = modePrefix + (fileContext
         ? `${fileContext}\n\n${trimmed}`
-        : trimmed
+        : trimmed)
 
       // Clear attachments after sending
       setAttachedFiles([])
@@ -382,9 +397,21 @@ export function useChat(): UseChatReturn {
                 }
               }
 
-              // Store write/edit/delete ops for approval
+              // Autocode mode: apply immediately. Normal mode: store for approval.
               if (writeOps.length > 0) {
-                setPendingFileOps(writeOps)
+                if (chatMode === 'autocode') {
+                  const results: string[] = []
+                  for (const op of writeOps) {
+                    const result = await applyOperation(op)
+                    results.push(result.success
+                      ? `✅ ${op.type} ${op.filePath}`
+                      : `❌ ${op.type} ${op.filePath}: ${result.error}`)
+                  }
+                  const summaryMsg = createAssistantMessage(results.join('\n'))
+                  setMessages((prev) => [...prev, summaryMsg].slice(-MAX_MESSAGES))
+                } else {
+                  setPendingFileOps(writeOps)
+                }
               }
             }
           } else {
@@ -451,6 +478,7 @@ export function useChat(): UseChatReturn {
       activeModelLabel,
       activeModelId,
       activePresetLabel,
+      chatMode,
     }),
     [
       isOpen,
@@ -463,6 +491,7 @@ export function useChat(): UseChatReturn {
       activeModelLabel,
       activeModelId,
       activePresetLabel,
+      chatMode,
     ],
   )
 
@@ -556,5 +585,6 @@ export function useChat(): UseChatReturn {
     pendingFileOps,
     approveFileOps,
     rejectFileOps,
+    cycleChatMode,
   }
 }

@@ -24,6 +24,8 @@ export interface FileAttachment {
   readonly language?: string   // for syntax highlighting
 }
 
+export type ChatMode = 'plan' | 'normal' | 'autocode'
+
 export interface ChatState {
   readonly isOpen: boolean
   readonly width: number           // sidebar width in px
@@ -38,6 +40,8 @@ export interface ChatState {
   readonly activeModelId?: string
   /** Router preset (balanced / performance / budget). */
   readonly activePresetLabel?: string
+  /** Chat operating mode: plan (read-only), normal (approval), autocode (YOLO) */
+  readonly chatMode: ChatMode
   /** Claude Code CLI TUI mode is active */
   readonly claudeMode?: boolean
   /** Captured Claude TUI output */

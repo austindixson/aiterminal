@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { InlineFileOpsApproval } from './InlineFileOpsApproval';
 import type { FileOperation } from '../../types/agent';
+import type { ChatMode } from '../../types/chat';
 import '../styles/components.css';
 
 interface ClaudeCodeChatProps {
@@ -22,6 +23,8 @@ interface ClaudeCodeChatProps {
   pendingFileOps?: ReadonlyArray<FileOperation>;
   onApproveFileOps?: () => void;
   onRejectFileOps?: () => void;
+  chatMode?: ChatMode;
+  onCycleChatMode?: () => void;
 }
 
 /**
@@ -46,6 +49,8 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
   pendingFileOps = [],
   onApproveFileOps,
   onRejectFileOps,
+  chatMode = 'normal',
+  onCycleChatMode,
 }) => {
   const [input, setInput] = useState('');
   const [isMultiline, setIsMultiline] = useState(false);
@@ -78,11 +83,15 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    console.log('[ClaudeCodeChat] Key pressed:', e.key, 'Shift:', e.shiftKey, 'isMultiline:', isMultiline, 'Input length:', input.length, 'Waiting for permissions:', isWaitingForPermissions);
+    // Shift+Tab: cycle chat mode
+    if (e.key === 'Tab' && e.shiftKey) {
+      e.preventDefault();
+      onCycleChatMode?.();
+      return;
+    }
 
     // Block input while waiting for permissions
     if (isWaitingForPermissions) {
-      console.log('[ClaudeCodeChat] ⚠️ Input blocked - waiting for permissions to be accepted');
       e.preventDefault();
       return;
     }
@@ -288,6 +297,18 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
           ...styles.prompt,
           ...(isWaitingForPermissions ? { opacity: 0.3 } : {})
         }}>▶</span>
+        {chatMode !== 'normal' && (
+          <button
+            onClick={onCycleChatMode}
+            style={{
+              ...modeIndicatorStyles.base,
+              ...(chatMode === 'plan' ? modeIndicatorStyles.plan : modeIndicatorStyles.autocode),
+            }}
+            title="Shift+Tab to cycle modes"
+          >
+            {chatMode === 'plan' ? 'PLAN' : 'YOLO'}
+          </button>
+        )}
         <textarea
           ref={textareaRef}
           value={input}
@@ -320,6 +341,31 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
       </div>
     </div>
   );
+};
+
+// Mode indicator styles
+const modeIndicatorStyles = {
+  base: {
+    padding: '2px 8px',
+    borderRadius: '4px',
+    fontSize: '10px',
+    fontWeight: 700 as const,
+    letterSpacing: '0.08em',
+    border: 'none',
+    cursor: 'pointer',
+    flexShrink: 0,
+    lineHeight: '16px',
+  },
+  plan: {
+    background: 'rgba(107, 157, 255, 0.2)',
+    color: '#6b9dff',
+    border: '1px solid rgba(107, 157, 255, 0.3)',
+  },
+  autocode: {
+    background: 'rgba(255, 149, 0, 0.2)',
+    color: '#ff9500',
+    border: '1px solid rgba(255, 149, 0, 0.3)',
+  },
 };
 
 // Styles

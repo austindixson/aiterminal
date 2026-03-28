@@ -954,6 +954,8 @@ export const App: FC = () => {
                 pendingFileOps={chat.pendingFileOps}
                 onApproveFileOps={chat.approveFileOps}
                 onRejectFileOps={chat.rejectFileOps}
+                chatMode={chat.state.chatMode}
+                onCycleChatMode={chat.cycleChatMode}
                 onSendMessage={async (text) => {
                   await chat.sendMessage(text)
                 }}
