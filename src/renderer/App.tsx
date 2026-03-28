@@ -110,25 +110,17 @@ export const App: FC = () => {
   // Speech bubbles for VRM avatar
   const speechBubbles = useSpeechBubbles()
 
-  // Listen for AI response events to auto-speak
+  // Listen for AI response events to auto-speak (use ref to avoid re-registering on every render)
+  const voiceSpeakRef = useRef(voice.speak)
+  voiceSpeakRef.current = voice.speak
+
   useEffect(() => {
     const handleAIResponse = (event: any) => {
-      console.log('[App] 🎯 AI response EVENT RECEIVED:', event.detail?.substring(0, 50))
-      console.log('[App] Calling voice.speak()...')
-      voice.speak(event.detail).then(() => {
-        console.log('[App] ✅ voice.speak() completed')
-      }).catch((err) => {
-        console.error('[App] ❌ voice.speak() failed:', err)
-      })
+      voiceSpeakRef.current(event.detail).catch(() => {})
     }
-
-    console.log('[App] Setting up ai-response event listener')
     window.addEventListener('ai-response', handleAIResponse)
-    return () => {
-      console.log('[App] Cleaning up ai-response event listener')
-      window.removeEventListener('ai-response', handleAIResponse)
-    }
-  }, [voice])
+    return () => window.removeEventListener('ai-response', handleAIResponse)
+  }, [])
 
   // Expose active intern globally for chat to access
   // Initialize immediately (synchronous) so it's available before first render
