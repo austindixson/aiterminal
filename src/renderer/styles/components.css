@@ -672,6 +672,37 @@
   overflow: hidden;
 }
 
+/* RP Mode: fullscreen VRM viewer */
+.right-sidebar--rp {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 500 !important;
+  border: none !important;
+  background: #0a0a14 !important;
+}
+
+.right-sidebar--rp .right-sidebar__avatar {
+  position: absolute;
+  inset: 0;
+}
+
+.right-sidebar--rp .intern-avatar {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.right-sidebar--rp .vrm-canvas-container {
+  border-radius: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.right-sidebar--rp .vrm-canvas-container canvas {
+  border-radius: 0 !important;
+}
+
 .right-sidebar__avatar .intern-avatar .avatar-header {
   position: absolute;
   top: 12px;

@@ -1017,11 +1017,8 @@ export const App: FC = () => {
               />
             )}
             <div
-              className="right-sidebar"
-              style={rpMode
-                ? { position: 'fixed', inset: 0, width: '100%', zIndex: 500 }
-                : { width: resizablePanels.sizes.rightSidebar }
-              }
+              className={`right-sidebar ${rpMode ? 'right-sidebar--rp' : ''}`}
+              style={rpMode ? undefined : { width: resizablePanels.sizes.rightSidebar }}
             >
               {/* VRM Avatar - full height */}
               <div className="right-sidebar__avatar">
