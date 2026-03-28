@@ -36,7 +36,7 @@ const TRAILING_QUESTION = /\?\s*$/;
  * and then error-analysis flow.
  */
 const GREETING_OR_SOCIAL =
-  /^(?:hello|hi|hey|howdy|sup|yo|greetings|morning|afternoon|evening)(?:\s+there)?$|^(?:good\s+(?:morning|afternoon|evening))$|^(?:thanks|thank\s+you|thx|bye|goodbye|cheers|ciao)\s*!*$/i;
+  /^(?:hello|hi|hey|howdy|sup|yo|greetings|morning|afternoon|evening)(?:\s+there)?[.!]*$|^(?:good\s+(?:morning|afternoon|evening))[.!]*$|^(?:thanks|thank\s+you|thx|bye|goodbye|cheers|ciao)\s*[.!]*$/i;
 
 /** Common command prefixes that should NOT be treated as natural language. */
 const COMMAND_PREFIXES = /^(cd|ls|cat|echo|grep|find|awk|sed|curl|wget|git|npm|npx|yarn|pnpm|bun|node|python|python3|pip|brew|apt|sudo|chmod|chown|mv|cp|rm|mkdir|touch|tar|zip|unzip|ssh|scp|docker|kubectl|make|cargo|go|rustc|gcc|java|javac|ruby|php|perl|which|whereis|man|env|export|source|alias|kill|ps|top|htop|df|du|mount|ping|traceroute|nslookup|dig|ifconfig|ip|netstat|systemctl|journalctl|crontab|tmux|screen|vim|vi|nano|emacs|code|claude|bat|exa|fd|rg|fzf|jq|yq|xargs|tee|wc|sort|uniq|head|tail|diff|patch|file|stat|readlink|basename|dirname|realpath|test|true|false|exit|clear|reset|history|set|unset|trap|wait|nohup|time|date|cal|uptime|whoami|hostname|uname|arch|sw_vers|pbcopy|pbpaste|open|say|osascript|defaults|launchctl|diskutil|hdiutil|codesign|xcrun|xcodebuild|swift|swiftc|clang|lldb|otool|lipo|xattr|mdls|mdfind|spotlight|dscl|ditto|installer|pkgutil|softwareupdate|start|stop|run|build|install|update|remove|delete|deploy|fix|debug|search)\b/;
