@@ -220,7 +220,7 @@ export const App: FC = () => {
     cwd: activeTabCwd,
     onComment: (comment) => {
       // Speak the comment via TTS (if enabled)
-      if (ttsEnabled) {
+      if (ttsEnabledRef.current) {
         voice.speak(comment).catch((err) => {
           console.error('[App] Failed to speak Claude Code comment:', err)
         })
@@ -231,13 +231,14 @@ export const App: FC = () => {
   })
 
   // Activate/deactivate Claude Code comments based on backend
+  // eslint-disable-next-line react-hooks/exhaustive-deps — claudeCodeComments is a new object each render
   useEffect(() => {
     if (backendSelector.activeBackend === 'claude-code') {
       claudeCodeComments.activate()
     } else {
       claudeCodeComments.deactivate()
     }
-  }, [backendSelector.activeBackend, claudeCodeComments])
+  }, [backendSelector.activeBackend])
 
   // Feed live Claude Code PTY stream into the comment analyzer
   useEffect(() => {

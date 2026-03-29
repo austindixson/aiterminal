@@ -118,7 +118,7 @@ export function InternAvatar({
   const currentModel = getModelForIntern(intern);
   const effectiveIntern = intern || 'sora';
 
-  console.log(`[InternAvatar] Rendering intern=${effectiveIntern}, isRunning=${isRunning}, vrmInitialized=${vrmInitializedRef.current}`);
+  // Debug log removed — was firing every render frame and flooding console
 
   // Reset VRM initialization when switching interns
   useEffect(() => {
