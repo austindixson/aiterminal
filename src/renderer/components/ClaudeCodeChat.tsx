@@ -62,18 +62,21 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
   // Local message state for Claude Code mode (bubbles without triggering OpenRouter)
   const [localMessages, setLocalMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 
-  // Track if user has scrolled up (don't force-scroll if they're reading history)
+  // Track if user has manually scrolled up
   const handleMessagesScroll = () => {
     const el = messagesContainerRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    userScrolledUpRef.current = distanceFromBottom > 80;
+    userScrolledUpRef.current = distanceFromBottom > 100;
   };
 
-  // Auto-scroll to bottom only when user is near bottom
+  // Auto-scroll: only when user hasn't scrolled up. Use instant scroll
+  // during streaming to avoid smooth-scroll animations fighting user input.
   useEffect(() => {
-    if (!userScrolledUpRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (userScrolledUpRef.current) return;
+    const el = messagesContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [messages]);
 
