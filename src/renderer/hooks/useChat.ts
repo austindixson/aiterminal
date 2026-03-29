@@ -869,55 +869,72 @@ export function useChat(): UseChatReturn {
 
               // Stop agent loop conditions
               if (chatMode === 'autocode') {
-                // Only stop if AI explicitly signals task completion (not just "tests done" in a status report)
-                if (operations.length === 0 && /(?:task|everything|all\s+\w+\s+is)\s+(?:complete|done|finished)|^complete\.?$/im.test(accumulated)) {
-                  agentLoopActiveRef.current = false
-                }
-                // Check if the response has any real content (not just tags/filler)
                 const strippedContent = accumulated.replace(/\[.*?\]/g, '').replace(/\[\/?\w*\]?/g, '').replace(/[→←↑↓•·,\s.\[\]\/]+/g, '').trim()
-                // Only stop if truly empty AND no tag fragments (tag fragments = model trying to act)
                 const hasTagFragments = /\[/.test(accumulated)
-                if (strippedContent.length === 0 && !hasTagFragments) {
+                const hasCompleteTags = operations.length > 0 || accumulated.includes('[RUN]') || accumulated.includes('[RUN:')
+                const isDone = /(?:task|everything|all\s+\w+\s+is)\s+(?:complete|done|finished)|^complete\.?$/im.test(accumulated)
+
+                console.log('[AgentLoop] Post-stream analysis:', {
+                  iteration: agentLoopIterationsRef.current,
+                  loopActive: agentLoopActiveRef.current,
+                  accumulatedLen: accumulated.length,
+                  strippedLen: strippedContent.length,
+                  hasTagFragments,
+                  hasCompleteTags,
+                  isDone,
+                  opsCount: operations.length,
+                  first80: accumulated.slice(0, 80),
+                })
+
+                if (isDone && !hasCompleteTags) {
+                  console.log('[AgentLoop] STOPPING — AI signaled completion')
                   agentLoopActiveRef.current = false
                 }
-                // Nudge: if AI produced any response but used no COMPLETE tool tags, remind it to act
-                const hasCompleteTags = operations.length > 0 || accumulated.includes('[RUN]') || accumulated.includes('[RUN:')
-                if (!hasCompleteTags && agentLoopActiveRef.current
-                    && !/\bcomplete\b|\bdone\b|\bfinished\b/i.test(accumulated)) {
+
+                if (strippedContent.length === 0 && !hasTagFragments) {
+                  console.log('[AgentLoop] STOPPING — truly empty response (no text, no tags)')
+                  agentLoopActiveRef.current = false
+                }
+
+                // Nudge or escalate: if no complete tool tags were used
+                if (!hasCompleteTags && agentLoopActiveRef.current && !isDone) {
                   agentLoopIterationsRef.current++
+                  const iter = agentLoopIterationsRef.current
+                  const needsEscalation = iter >= 2
 
-                  // After 2 failed nudges, force-escalate to a stronger model
-                  const needsEscalation = agentLoopIterationsRef.current >= 2
+                  console.log(`[AgentLoop] NUDGE #${iter} — no complete tags.${needsEscalation ? ' ESCALATING model.' : ''}`)
 
-                  if (agentLoopIterationsRef.current < MAX_AGENT_ITERATIONS) {
+                  if (iter < MAX_AGENT_ITERATIONS) {
                     setTimeout(() => {
-                      if (agentLoopActiveRef.current) {
-                        if (needsEscalation) {
-                          // Escalate: use the preset's escalation model directly
-                          const api = window.electronAPI
-                          api?.getActiveAiModel?.('general').then((info: { presetName?: string }) => {
-                            const presetName = info?.presetName || 'budget'
-                            // Import getPreset to find escalation model
-                            const escalationModels: Record<string, string> = {
-                              budget: 'qwen/qwen3-coder-next',
-                              balanced: 'z-ai/glm-5',
-                              speed: 'qwen/qwen3-coder-next',
-                              performance: 'anthropic/claude-sonnet-4-20250514',
-                            }
-                            const escalationModel = escalationModels[presetName] || 'qwen/qwen3-coder-next'
-                            console.log(`[useChat] Escalating to ${escalationModel} after ${agentLoopIterationsRef.current} failed nudges`)
-                            sendMessageInternal(
-                              'The previous model could not use tool tags. You MUST use tags to act:\n- [RUN:command] to execute (e.g. [RUN:pytest])\n- [READ:path] to read files\n- [EDIT:path]content[/EDIT] to edit\nACT NOW.',
-                              escalationModel,
-                            )
-                          }).catch(() => {
-                            sendMessageInternal('ACT NOW with [RUN:command] or [READ:path] tags. Do not describe.')
-                          })
-                        } else {
-                          sendMessageInternal('STOP describing. ACT NOW. Use these exact tags:\n- [RUN:pytest] to run commands\n- [READ:main.py] to read files\nDo NOT explain. Just do it.')
+                      if (!agentLoopActiveRef.current) {
+                        console.log('[AgentLoop] Nudge cancelled — loop no longer active')
+                        return
+                      }
+                      if (needsEscalation) {
+                        const escalationModels: Record<string, string> = {
+                          budget: 'qwen/qwen3-coder-next',
+                          balanced: 'z-ai/glm-5',
+                          speed: 'qwen/qwen3-coder-next',
+                          performance: 'anthropic/claude-sonnet-4-20250514',
                         }
+                        const api = window.electronAPI
+                        api?.getActiveAiModel?.('general').then((info: { presetName?: string }) => {
+                          const model = escalationModels[info?.presetName || 'budget'] || 'qwen/qwen3-coder-next'
+                          console.log(`[AgentLoop] Escalating to ${model}`)
+                          sendMessageInternal(
+                            'The previous model could not use tool tags. You MUST use tags to act:\n- [RUN:command] to execute (e.g. [RUN:pytest])\n- [READ:path] to read files\n- [EDIT:path]content[/EDIT] to edit\nACT NOW.',
+                            model,
+                          )
+                        }).catch(() => {
+                          sendMessageInternal('ACT NOW with [RUN:command] or [READ:path] tags.')
+                        })
+                      } else {
+                        sendMessageInternal('STOP describing. ACT NOW. Use these exact tags:\n- [RUN:pytest] to run commands\n- [READ:main.py] to read files\nDo NOT explain. Just do it.')
                       }
                     }, 300)
+                  } else {
+                    console.log(`[AgentLoop] Max iterations (${MAX_AGENT_ITERATIONS}) reached — stopping`)
+                    agentLoopActiveRef.current = false
                   }
                 }
               }
@@ -926,6 +943,16 @@ export function useChat(): UseChatReturn {
               const hasAnyOps = operations.length > 0
               const hasRunOps = accumulated.includes('[RUN]') || accumulated.includes('[RUN:')
               const hasPartialTag = /\[(?:READ|EDIT|RUN|FILE)(?::|\s*$)/m.test(accumulated)
+
+              console.log('[AgentLoop] Continuation check:', {
+                chatMode,
+                loopActive: agentLoopActiveRef.current,
+                hasAnyOps,
+                hasRunOps,
+                hasPartialTag,
+                willContinue: chatMode === 'autocode' && agentLoopActiveRef.current && (hasAnyOps || hasRunOps || hasPartialTag),
+              })
+
               if (chatMode === 'autocode' && agentLoopActiveRef.current && (hasAnyOps || hasRunOps || hasPartialTag)) {
                 agentLoopIterationsRef.current++
                 if (agentLoopIterationsRef.current < MAX_AGENT_ITERATIONS) {
