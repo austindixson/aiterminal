@@ -584,8 +584,8 @@ export function useChat(): UseChatReturn {
       const modePrefix = chatMode === 'plan'
         ? '[PLAN MODE] Describe what changes you would make and why, but do NOT use [FILE], [EDIT], or [DELETE] tags. Only analyze and explain your plan.\n\n'
         : chatMode === 'autocode'
-        ? '[AUTOCODE MODE] You have full autonomy. DO NOT suggest actions — TAKE them directly. Use [READ:path] to read files, [EDIT:path] to fix code, [RUN:command] to execute commands (e.g. [RUN:npm test], [RUN:cargo build]). Act immediately without asking permission. If you find errors, read the file, fix it, and verify. Never say "you should" — just do it.\n\n'
-        : 'Use your tool tags to take action. Read files with [READ:path], run commands with [RUN:command] (e.g. [RUN:ls], [RUN:npm test]), edit files with [EDIT:path]. Act proactively — do not just describe what you would do.\n\n'
+        ? '[AUTOCODE MODE] You have full autonomy. ALWAYS start your response with a brief one-line statement of what you are about to do, THEN use tool tags. Example: "Running the test suite." followed by [RUN:cargo test]. Use [READ:path] to read files, [EDIT:path] to fix code, [RUN:command] to execute commands. Act immediately without asking permission. Never say "you should" — just do it.\n\n'
+        : 'ALWAYS start with a brief statement of what you are doing, THEN use tool tags. Read files with [READ:path], run commands with [RUN:command] (e.g. [RUN:ls], [RUN:npm test]), edit files with [EDIT:path]. Act proactively.\n\n'
 
       const allContext = [persistentFiles, fileContext].filter(Boolean).join('\n\n')
       const fullPrompt = modePrefix + (allContext
@@ -710,6 +710,8 @@ export function useChat(): UseChatReturn {
             )
 
             let accumulated = ''
+            let repetitionCount = 0
+            let lastChunkPattern = ''
 
             await api.aiQueryStream(
               { prompt: fullPrompt, taskType: 'general', context, modelOverride },
@@ -720,6 +722,27 @@ export function useChat(): UseChatReturn {
                 }
                 if (payload.chunk) {
                   accumulated += payload.chunk
+
+                  // Detect repetition loops (budget models get stuck generating [/ [/ [/ ...)
+                  const last50 = accumulated.slice(-50)
+                  const pattern = last50.match(/(\[\/?\w*\]?\s*){5,}/)?.[0] || ''
+                  if (pattern.length > 10 && pattern === lastChunkPattern) {
+                    repetitionCount++
+                    if (repetitionCount > 3) {
+                      // Cancel the stream — model is stuck
+                      console.warn('[useChat] Repetition loop detected, cancelling stream')
+                      if (activeStreamIdRef.current && api.cancelAIStream) {
+                        api.cancelAIStream(activeStreamIdRef.current)
+                      }
+                      // Truncate accumulated to remove the junk
+                      const cleanEnd = accumulated.search(/(\[\/?\s*){10,}/)
+                      if (cleanEnd > 0) accumulated = accumulated.slice(0, cleanEnd)
+                      return
+                    }
+                  } else {
+                    repetitionCount = 0
+                    lastChunkPattern = pattern
+                  }
 
                   const displayText = stripAllToolTags(accumulated)
 

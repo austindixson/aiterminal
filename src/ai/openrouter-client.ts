@@ -342,6 +342,7 @@ export class OpenRouterClient implements IAIClient {
           messages: [...messages],
           max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
           stream: true,
+          timeout: 120000, // 2 minute timeout for stream setup
           ...this.getProviderBody(),
         });
 
