@@ -725,6 +725,19 @@ export function useChat(): UseChatReturn {
                 if (accumulated.replace(/\[.*?\]/g, '').trim().length === 0) {
                   agentLoopActiveRef.current = false
                 }
+                // Nudge: if AI described intent but used no tool tags, remind it to act
+                if (operations.length === 0 && !accumulated.includes('[RUN]') && agentLoopActiveRef.current
+                    && !/\bcomplete\b|\bdone\b|\bfinished\b/i.test(accumulated)
+                    && accumulated.trim().length > 20) {
+                  agentLoopIterationsRef.current++
+                  if (agentLoopIterationsRef.current < MAX_AGENT_ITERATIONS) {
+                    setTimeout(() => {
+                      if (agentLoopActiveRef.current) {
+                        sendMessageInternal('You described what you would do but did not act. Use [READ:path] [EDIT:path] [RUN]command[/RUN] tags NOW. Do not describe — execute.')
+                      }
+                    }, 300)
+                  }
+                }
               }
 
               // Autocode agent loop: only auto-continue if WRITE operations were performed
