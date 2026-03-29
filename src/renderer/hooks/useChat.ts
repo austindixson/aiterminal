@@ -13,6 +13,7 @@ import type { FileOperation } from '@/types/agent'
 import { parseAgentResponse, applyOperation } from '@/agent/agent-service'
 import { DEFAULT_INTERN_ID } from '@/intern-config'
 import { useSessionHistory } from './useSessionHistory'
+import { getAgentLoopState } from '@/types/agent-loop-state'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -256,6 +257,7 @@ export function useChat(): UseChatReturn {
   const sessionHistory = useSessionHistory()
   const agentLoopActiveRef = useRef(false)
   const agentLoopIterationsRef = useRef(0)
+  const activeStreamIdRef = useRef<string | null>(null)
   const MAX_AGENT_ITERATIONS = 10
 
   const cycleChatMode = useCallback(() => {
@@ -361,7 +363,7 @@ export function useChat(): UseChatReturn {
       // Update system prompt with active intern + CWD before sending
       const api = window.electronAPI
       if (api?.updateInternSystemPrompt) {
-        const agentState = (window as any).agentLoopState
+        const agentState = getAgentLoopState()
         const activeIntern = agentState?.activeIntern || DEFAULT_INTERN_ID
         const cwd = agentState?.cwd as string | undefined
         // System prompt update — no hot-path logging
@@ -405,7 +407,7 @@ export function useChat(): UseChatReturn {
           typeof window !== 'undefined' && 'electronAPI' in window && api?.aiQuery
 
         if (hasElectronAPI) {
-          const context = messages.slice(-10).map((msg) => ({
+          const context = messages.slice(-20).map((msg) => ({
             role: msg.role as 'user' | 'assistant',
             content: msg.content,
           }))
@@ -426,7 +428,7 @@ export function useChat(): UseChatReturn {
 
             if (chatMode === 'autocode') {
               // AUTOCODE: execute commands in the active terminal and capture output
-              const sessionId = (window as any).agentLoopState?.activeSessionId as string | undefined
+              const sessionId = getAgentLoopState().activeSessionId
               for (const cmd of commands) {
                 if (sessionId && window.electronAPI?.writeToSession) {
                   window.electronAPI.writeToSession(sessionId, cmd + '\r')
@@ -481,6 +483,10 @@ export function useChat(): UseChatReturn {
             await api.aiQueryStream(
               { prompt: fullPrompt, taskType: 'general', context, modelOverride },
               (payload) => {
+                // Capture requestId for cancellation
+                if (!activeStreamIdRef.current && payload.requestId) {
+                  activeStreamIdRef.current = payload.requestId
+                }
                 if (payload.chunk) {
                   accumulated += payload.chunk
                   sentenceBuffer += payload.chunk
@@ -686,6 +692,7 @@ export function useChat(): UseChatReturn {
         setMessages((prev) => [...prev, errorMsg].slice(-MAX_MESSAGES))
       } finally {
         setIsStreaming(false)
+        activeStreamIdRef.current = null
       }
     },
     [attachedFiles, messages, chatMode],
@@ -779,7 +786,7 @@ export function useChat(): UseChatReturn {
     if (isOpen) {
       const api = window.electronAPI
       if (api?.updateInternSystemPrompt) {
-        const agentState = (window as any).agentLoopState
+        const agentState = getAgentLoopState()
         const activeIntern = agentState?.activeIntern || DEFAULT_INTERN_ID
         api.updateInternSystemPrompt(activeIntern).catch((err) => {
           console.error('[useChat] Failed to update system prompt:', err)
@@ -829,6 +836,11 @@ export function useChat(): UseChatReturn {
     stopAgentLoop: useCallback(() => {
       agentLoopActiveRef.current = false
       agentLoopIterationsRef.current = 0
+      // Cancel the active streaming request if any
+      if (activeStreamIdRef.current) {
+        window.electronAPI?.cancelAIStream?.(activeStreamIdRef.current)
+        activeStreamIdRef.current = null
+      }
     }, []),
     isAgentLooping: isStreaming && agentLoopActiveRef.current,
     revertToSnapshot: useCallback((snapshotId: string) => {

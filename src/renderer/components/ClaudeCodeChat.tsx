@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { InlineFileOpsApproval } from './InlineFileOpsApproval';
 import { ToolCallDisplay } from './ToolCallDisplay';
+import { ChatErrorBoundary } from './ChatErrorBoundary';
 import { parseMessageIntoParts } from '../../types/message-parts';
 import type { FileOperation } from '../../types/agent';
 import type { ChatMode } from '../../types/chat';
@@ -280,7 +281,7 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
         )}
         {(backend === 'claude-code' ? localMessages : messages).map((msg, idx) => (
           <div
-            key={idx}
+            key={'id' in msg ? (msg as { id: string }).id : `msg-${idx}`}
             style={{
               ...styles.message,
               ...(msg.role === 'assistant' ? styles.messageRight : styles.messageLeft)
@@ -316,6 +317,7 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
             )}
             <div style={styles.messageBubble}>
               <div style={styles.messageContent}>
+                <ChatErrorBoundary>
                 {(() => {
                   if (msg.role === 'assistant') {
                     // Parse into typed parts for structured rendering
@@ -382,6 +384,7 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
                     </div>
                   );
                 })()}
+                </ChatErrorBoundary>
               </div>
             </div>
           </div>

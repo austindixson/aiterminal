@@ -410,6 +410,8 @@ export function setupAllHandlers(
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Stream failed';
       send({ requestId, chunk: '', done: true, error: message });
+    } finally {
+      cancelledStreamIds.delete(requestId);
     }
   });
 

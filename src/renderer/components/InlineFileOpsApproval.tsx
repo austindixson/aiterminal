@@ -24,16 +24,9 @@ const OP_COLORS: Record<string, string> = {
 /**
  * Inline diff view for a single search/replace edit.
  */
-const DiffBlock: React.FC<{ op: FileOperation }> = ({ op }) => {
+const DiffBlock: React.FC<{ op: FileOperation; wide: boolean }> = ({ op, wide }) => {
   const searchLines = (op.searchText || '').split('\n');
   const replaceLines = (op.replaceText || '').split('\n');
-  const [wide, setWide] = useState(window.innerWidth > 800);
-
-  useEffect(() => {
-    const handler = () => setWide(window.innerWidth > 800);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
 
   return (
     <div style={diffStyles.container}>
@@ -127,6 +120,18 @@ export const InlineFileOpsApproval: React.FC<InlineFileOpsApprovalProps> = ({
   onApprove,
   onReject,
 }) => {
+  // Hoist responsive state — single listener shared by all DiffBlocks
+  const [wide, setWide] = useState(window.innerWidth > 800);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setWide(window.innerWidth > 800), 100);
+    };
+    window.addEventListener('resize', handler);
+    return () => { window.removeEventListener('resize', handler); clearTimeout(timer); };
+  }, []);
+
   if (operations.length === 0) return null;
 
   return (
@@ -141,7 +146,7 @@ export const InlineFileOpsApproval: React.FC<InlineFileOpsApprovalProps> = ({
         {operations.map((op) => (
           <div key={op.id}>
             {op.type === 'edit' && op.searchText != null ? (
-              <DiffBlock op={op} />
+              <DiffBlock op={op} wide={wide} />
             ) : op.type === 'create' || (op.type === 'edit' && op.content) ? (
               <FilePreviewBlock op={op} />
             ) : (
