@@ -31,11 +31,11 @@ const performance: RouterPreset = {
 
 const budget: RouterPreset = {
   name: 'budget',
-  description: 'Cheapest viable model for each task — ideal for high-volume or cost-sensitive usage.',
-  commandHelper: 'google/gemini-2.0-flash-001',
-  codeExplainer: 'deepseek/deepseek-chat',
-  generalAssistant: 'openai/gpt-4o-mini-2024-07-18',
-  errorAnalyzer: 'deepseek/deepseek-chat',
+  description: 'Free Nvidia Nemotron models — zero cost for daily use.',
+  commandHelper: 'nvidia/nemotron-3-nano-30b-a3b:free',
+  codeExplainer: 'nvidia/nemotron-3-super-120b-a12b:free',
+  generalAssistant: 'nvidia/nemotron-3-nano-30b-a3b:free',
+  errorAnalyzer: 'nvidia/nemotron-3-super-120b-a12b:free',
 };
 
 const speed: RouterPreset = {

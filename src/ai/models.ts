@@ -102,6 +102,26 @@ const gemini25Pro: ModelConfig = {
   contextWindow: 1_000_000,
 };
 
+const nemotronNano: ModelConfig = {
+  id: 'nvidia/nemotron-3-nano-30b-a3b:free',
+  name: 'Nemotron Nano 30B',
+  provider: 'nvidia',
+  inputCostPer1M: 0,
+  outputCostPer1M: 0,
+  maxTokens: 8192,
+  contextWindow: 131_072,
+};
+
+const nemotronSuper: ModelConfig = {
+  id: 'nvidia/nemotron-3-super-120b-a12b:free',
+  name: 'Nemotron Super 120B',
+  provider: 'nvidia',
+  inputCostPer1M: 0,
+  outputCostPer1M: 0,
+  maxTokens: 8192,
+  contextWindow: 131_072,
+};
+
 // ---------------------------------------------------------------------------
 // Exported registry  (keyed by OpenRouter model ID)
 // ---------------------------------------------------------------------------
@@ -116,6 +136,8 @@ export const MODELS: ReadonlyMap<string, ModelConfig> = new Map<string, ModelCon
   [deepseekV3.id, deepseekV3],
   [gemini20Flash.id, gemini20Flash],
   [gemini25Pro.id, gemini25Pro],
+  [nemotronNano.id, nemotronNano],
+  [nemotronSuper.id, nemotronSuper],
 ]);
 
 /**
