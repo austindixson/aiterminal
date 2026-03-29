@@ -97,6 +97,7 @@ const electronAPI: ElectronAPI = {
         cancelled?: boolean;
         model?: string;
         modelLabel?: string;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
       },
     ) => {
       if (payload.requestId !== requestId) return;

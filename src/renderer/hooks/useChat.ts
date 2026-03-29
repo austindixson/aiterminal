@@ -538,10 +538,18 @@ export function useChat(): UseChatReturn {
                     ),
                   )
                 }
-                if (payload.done && payload.modelLabel) {
+                if (payload.done && (payload.modelLabel || payload.usage)) {
                   setMessages((prev) =>
                     prev.map((m) =>
-                      m.id === placeholderId ? { ...m, model: payload.modelLabel } : m,
+                      m.id === placeholderId ? {
+                        ...m,
+                        model: payload.modelLabel || m.model,
+                        tokens: payload.usage ? {
+                          prompt: payload.usage.prompt_tokens,
+                          completion: payload.usage.completion_tokens,
+                          total: payload.usage.total_tokens,
+                        } : undefined,
+                      } : m,
                     ),
                   )
                 }

@@ -256,6 +256,11 @@ export class OpenRouterClient implements IAIClient {
         if (choice?.finish_reason && choice.finish_reason !== 'stop') {
           console.warn(`[OpenRouter] Stream ended with finish_reason: ${choice.finish_reason}`);
         }
+        // Capture usage from final chunk (OpenRouter includes it)
+        const usage = (chunk as any).usage;
+        if (usage) {
+          yield `\x00USAGE:${JSON.stringify(usage)}`;
+        }
       }
     } catch (error: unknown) {
       const errorMessage =

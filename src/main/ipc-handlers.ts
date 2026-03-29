@@ -364,6 +364,7 @@ export function setupAllHandlers(
       cancelled?: boolean;
       model?: string;
       modelLabel?: string;
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
     }) => {
       if (!event.sender.isDestroyed()) {
         event.sender.send('ai-stream-chunk', payload);
@@ -381,11 +382,20 @@ export function setupAllHandlers(
         modelOverride,
       };
 
+      let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
+
       for await (const chunk of aiClient.streamQuery(aiRequest)) {
         if (cancelledStreamIds.has(requestId)) {
           cancelledStreamIds.delete(requestId);
           send({ requestId, chunk: '', done: true, cancelled: true });
           return;
+        }
+        // Check for usage sentinel from stream
+        if (chunk.startsWith('\x00USAGE:')) {
+          try {
+            usage = JSON.parse(chunk.slice(7));
+          } catch { /* ignore parse errors */ }
+          continue;
         }
         send({ requestId, chunk, done: false });
       }
@@ -395,6 +405,7 @@ export function setupAllHandlers(
         done: true,
         model: activeModel.id,
         modelLabel: activeModel.name,
+        usage,
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Stream failed';

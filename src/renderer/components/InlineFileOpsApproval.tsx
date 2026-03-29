@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { FileOperation } from '../../types/agent';
 
 interface InlineFileOpsApprovalProps {
@@ -27,26 +27,59 @@ const OP_COLORS: Record<string, string> = {
 const DiffBlock: React.FC<{ op: FileOperation }> = ({ op }) => {
   const searchLines = (op.searchText || '').split('\n');
   const replaceLines = (op.replaceText || '').split('\n');
+  const [wide, setWide] = useState(window.innerWidth > 800);
+
+  useEffect(() => {
+    const handler = () => setWide(window.innerWidth > 800);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   return (
     <div style={diffStyles.container}>
       <div style={diffStyles.header}>
         <span style={diffStyles.fileName}>{op.filePath}</span>
+        <span style={diffStyles.lineCount}>
+          -{searchLines.length} +{replaceLines.length}
+        </span>
       </div>
-      <div style={diffStyles.code}>
-        {searchLines.map((line, i) => (
-          <div key={`s-${i}`} style={diffStyles.removedLine}>
-            <span style={diffStyles.linePrefix}>-</span>
-            <span>{line || ' '}</span>
+      {wide ? (
+        /* Split view — side by side when wide */
+        <div style={{ display: 'flex', ...diffStyles.code }}>
+          <div style={{ flex: 1, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+            {searchLines.map((line, i) => (
+              <div key={`s-${i}`} style={diffStyles.removedLine}>
+                <span style={diffStyles.linePrefix}>-</span>
+                <span>{line || ' '}</span>
+              </div>
+            ))}
           </div>
-        ))}
-        {replaceLines.map((line, i) => (
-          <div key={`r-${i}`} style={diffStyles.addedLine}>
-            <span style={diffStyles.linePrefix}>+</span>
-            <span>{line || ' '}</span>
+          <div style={{ flex: 1 }}>
+            {replaceLines.map((line, i) => (
+              <div key={`r-${i}`} style={diffStyles.addedLine}>
+                <span style={diffStyles.linePrefix}>+</span>
+                <span>{line || ' '}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        /* Unified view — stacked when narrow */
+        <div style={diffStyles.code}>
+          {searchLines.map((line, i) => (
+            <div key={`s-${i}`} style={diffStyles.removedLine}>
+              <span style={diffStyles.linePrefix}>-</span>
+              <span>{line || ' '}</span>
+            </div>
+          ))}
+          {replaceLines.map((line, i) => (
+            <div key={`r-${i}`} style={diffStyles.addedLine}>
+              <span style={diffStyles.linePrefix}>+</span>
+              <span>{line || ' '}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

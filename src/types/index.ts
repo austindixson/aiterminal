@@ -129,6 +129,7 @@ export interface ElectronAPI {
       cancelled?: boolean;
       model?: string;
       modelLabel?: string;
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
     }) => void,
   ) => Promise<void>;
   cancelAIStream: (requestId: string) => void;

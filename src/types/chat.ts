@@ -15,6 +15,11 @@ export interface ChatMessage {
   readonly model?: string
   readonly isStreaming?: boolean
   readonly attachments?: ReadonlyArray<FileAttachment>
+  readonly tokens?: {
+    readonly prompt?: number
+    readonly completion?: number
+    readonly total?: number
+  }
 }
 
 export interface FileAttachment {

@@ -59,6 +59,7 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
 }) => {
   const [input, setInput] = useState('');
   const [isMultiline, setIsMultiline] = useState(false);
+  const [showToolDetails, setShowToolDetails] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -232,6 +233,17 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
             )}
           </div>
           <button
+            onClick={() => setShowToolDetails(prev => !prev)}
+            style={{
+              ...styles.closeButton,
+              fontSize: '10px',
+              opacity: showToolDetails ? 0.7 : 0.3,
+            }}
+            title={showToolDetails ? 'Hide tool details' : 'Show tool details'}
+          >
+            {showToolDetails ? '{}' : '{ }'}
+          </button>
+          <button
             onClick={onClose}
             style={styles.closeButton}
             title="Close chat (Escape)"
@@ -270,6 +282,14 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
                 <span style={styles.aiName}>{activeIntern ? activeIntern.toUpperCase() : 'MEI'}</span>
                 <span style={styles.aiModel}>•</span>
                 <span style={styles.aiModel}>{presetLabel || modelLabel || 'Unknown'}</span>
+                {'tokens' in msg && (msg as any).tokens?.total && (
+                  <>
+                    <span style={styles.aiModel}>•</span>
+                    <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>
+                      {(msg as any).tokens.total.toLocaleString()}t
+                    </span>
+                  </>
+                )}
               </div>
             )}
             <div style={styles.messageBubble}>
@@ -279,7 +299,7 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
                     const { cleanText, toolCalls } = renderToolCalls(msg.content);
                     return (
                       <>
-                        {toolCalls.length > 0 && (
+                        {showToolDetails && toolCalls.length > 0 && (
                           <div style={{ marginBottom: cleanText ? '8px' : 0 }}>
                             {toolCalls}
                           </div>
