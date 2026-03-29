@@ -561,7 +561,6 @@ export function useChat(): UseChatReturn {
                   if (result.content) {
                     const lines = result.content.split('\n').length
                     const size = result.content.length
-                    const preview = result.content.slice(0, 3000)
                     // Compact file read indicator (content is in AI context, not displayed)
                     const fileMsg = createAssistantMessage(
                       `📄 Read **${readOp.filePath}** — ${lines} lines, ${Math.round(size / 1024)}KB`,
