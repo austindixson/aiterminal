@@ -938,6 +938,7 @@ export const App: FC = () => {
                           filePath={tab.filePath}
                           content={tab.content}
                           language={tab.language}
+                          isActive={tab.isActive}
                           onSave={async (path, newContent) => {
                             try {
                               await window.electronAPI.writeFile(path, newContent)

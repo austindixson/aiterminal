@@ -459,7 +459,7 @@ export function useChat(): UseChatReturn {
         setIsStreaming(false)
       }
     },
-    [attachedFiles, messages],
+    [attachedFiles, messages, chatMode],
   )
 
   // -------------------------------------------------------------------------

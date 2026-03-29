@@ -5,6 +5,7 @@ interface FileTabViewProps {
   filePath: string;
   content: string;
   language: string | null;
+  isActive?: boolean;
   onSave?: (filePath: string, content: string) => void;
 }
 
@@ -12,7 +13,7 @@ interface FileTabViewProps {
  * Editable code editor rendered inside a terminal tab slot.
  * Textarea with synced line numbers, Cmd+S save, and modified indicator.
  */
-export const FileTabView: FC<FileTabViewProps> = ({ filePath, content, language, onSave }) => {
+export const FileTabView: FC<FileTabViewProps> = ({ filePath, content, language, isActive = true, onSave }) => {
   const [value, setValue] = useState(content);
   const [modified, setModified] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -49,8 +50,9 @@ export const FileTabView: FC<FileTabViewProps> = ({ filePath, content, language,
     }
   }, [onSave, filePath, value]);
 
-  // Cmd+S to save
+  // Cmd+S to save — only when this tab is active
   useEffect(() => {
+    if (!isActive) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
@@ -59,7 +61,7 @@ export const FileTabView: FC<FileTabViewProps> = ({ filePath, content, language,
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave]);
+  }, [handleSave, isActive]);
 
   // Handle Tab key for indentation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

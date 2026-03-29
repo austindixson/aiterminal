@@ -290,8 +290,12 @@ export async function applyOperation(
           if (existing.error || existing.content == null) {
             return { success: false, error: existing.error || 'File not found' }
           }
-          if (!existing.content.includes(op.searchText)) {
+          const matchCount = existing.content.split(op.searchText).length - 1
+          if (matchCount === 0) {
             return { success: false, error: 'Search text not found in file' }
+          }
+          if (matchCount > 1) {
+            return { success: false, error: `Search text matches ${matchCount} locations — expected exactly 1. Make the search text more specific.` }
           }
           const updated = existing.content.replace(op.searchText, op.replaceText)
           await api.writeFile(op.filePath, updated)
