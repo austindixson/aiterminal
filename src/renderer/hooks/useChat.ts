@@ -282,15 +282,37 @@ export function useChat(): UseChatReturn {
 
           const applyRunTags = (raw: string): string => {
             let text = raw
-            const runMatch = text.match(/\[RUN\](.*?)\[\/RUN\]/s)
-            if (runMatch) {
-              const command = runMatch[1].trim()
-              // SECURITY: Never auto-execute commands. Show for user approval only.
-              // This prevents prompt injection from executing arbitrary code.
-              text = text.replace(/\[RUN\].*?\[\/RUN\]/s, '').trim()
+            // Extract all [RUN] commands
+            const runRegex = /\[RUN\](.*?)\[\/RUN\]/gs
+            const commands: string[] = []
+            let match: RegExpExecArray | null
+            while ((match = runRegex.exec(text)) !== null) {
+              commands.push(match[1].trim())
+            }
+            if (commands.length === 0) return text
+
+            // Strip tags from display
+            text = text.replace(/\[RUN\].*?\[\/RUN\]/gs, '').trim()
+
+            if (chatMode === 'autocode') {
+              // AUTOCODE: execute commands in the active terminal
+              const sessionId = (window as any).agentLoopState?.activeSessionId as string | undefined
+              for (const cmd of commands) {
+                if (sessionId && window.electronAPI?.writeToSession) {
+                  window.electronAPI.writeToSession(sessionId, cmd + '\r')
+                }
+                text = text
+                  ? `⚡ Executed: \`${cmd}\`\n\n${text}`
+                  : `⚡ Executed: \`${cmd}\``
+              }
+            } else {
+              // NORMAL/PLAN: show as suggested commands
+              const cmdBlock = commands
+                .map(cmd => `\`\`\`\n${cmd}\n\`\`\``)
+                .join('\n')
               text = text
-                ? `💡 Suggested command:\n\`\`\`\n${command}\n\`\`\`\nCopy & run manually if intended.\n\n${text}`
-                : `💡 Suggested command:\n\`\`\`\n${command}\n\`\`\`\nCopy & run manually if intended.`
+                ? `💡 Suggested command:\n${cmdBlock}\n\n${text}`
+                : `💡 Suggested command:\n${cmdBlock}`
             }
             return text
           }

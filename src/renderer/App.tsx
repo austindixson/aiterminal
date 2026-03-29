@@ -184,8 +184,9 @@ export const App: FC = () => {
       activeIntern: agentLoop.activeIntern || DEFAULT_INTERN_ID,
       enabled: agentLoop.enabled,
       cwd: activeTabCwd,
+      activeSessionId: terminalTabs.getActiveSessionId(),
     }
-  }, [agentLoop.activeIntern, agentLoop.enabled, activeTabCwd])
+  }, [agentLoop.activeIntern, agentLoop.enabled, activeTabCwd, terminalTabs.state.activeTabId])
 
   // Refresh cwd when switching tabs (probes real shell cwd from PTY pid)
   useEffect(() => {
