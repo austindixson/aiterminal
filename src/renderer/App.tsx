@@ -15,6 +15,7 @@ import type { FilePickerResult } from '@/types/file-context'
 import { sanitizeInput, detectPromptInjection } from '@/renderer/utils/sanitizeInput'
 import { useVoiceIO } from '@/renderer/hooks/useVoiceIO'
 
+import { DEFAULT_INTERN_ID } from '@/intern-config'
 // Hooks
 import { useTheme } from '@/renderer/hooks/useTheme'
 import { useCmdK } from '@/renderer/hooks/useCmdK'
@@ -106,7 +107,7 @@ export const App: FC = () => {
   })
 
   // Voice I/O for TTS (Amica-style voice chat)
-  const voice = useVoiceIO(undefined, agentLoop.activeIntern || 'sora')
+  const voice = useVoiceIO(undefined, agentLoop.activeIntern || DEFAULT_INTERN_ID)
 
   // Claude Code comments - contextual voice feedback during Claude Code sessions
   // Speech bubbles for VRM avatar
@@ -180,7 +181,7 @@ export const App: FC = () => {
   // Expose active intern + CWD globally for chat to access
   useEffect(() => {
     (window as any).agentLoopState = {
-      activeIntern: agentLoop.activeIntern || 'sora',
+      activeIntern: agentLoop.activeIntern || DEFAULT_INTERN_ID,
       enabled: agentLoop.enabled,
       cwd: activeTabCwd,
     }
@@ -998,7 +999,7 @@ export const App: FC = () => {
                 }}
                 backend={backendSelector.activeBackend}
                 claudeCodeStream={backendSelector.claudeCodeStream}
-                activeIntern={agentLoop.activeIntern || 'sora'}
+                activeIntern={agentLoop.activeIntern || DEFAULT_INTERN_ID}
                 modelLabel={chat.state.activeModelLabel}
                 presetLabel={chat.state.activePresetLabel}
                 writeToClaudeCode={backendSelector.writeToClaudeCode}
@@ -1056,7 +1057,7 @@ export const App: FC = () => {
               {/* VRM Avatar - full height */}
               <div className="right-sidebar__avatar">
                 <InternAvatar
-                  intern={agentLoop.activeIntern || 'sora'}
+                  intern={agentLoop.activeIntern || DEFAULT_INTERN_ID}
                   isRunning={agentLoop.isRunning}
                   events={agentLoop.events}
                   onInternSelect={rpMode ? undefined : agentLoop.setActiveIntern}

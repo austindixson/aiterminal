@@ -11,6 +11,7 @@ import { MODELS } from '@/ai/models'
 import type { ChatMessage, ChatMode, ChatState, FileAttachment } from '@/types/chat'
 import type { FileOperation } from '@/types/agent'
 import { parseAgentResponse, applyOperation } from '@/agent/agent-service'
+import { DEFAULT_INTERN_ID } from '@/intern-config'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -239,9 +240,9 @@ export function useChat(): UseChatReturn {
       const api = window.electronAPI
       if (api?.updateInternSystemPrompt) {
         const agentState = (window as any).agentLoopState
-        const activeIntern = agentState?.activeIntern || 'sora'
+        const activeIntern = agentState?.activeIntern || DEFAULT_INTERN_ID
         const cwd = agentState?.cwd as string | undefined
-        console.log('[useChat] Updating system prompt for intern:', activeIntern, 'cwd:', cwd)
+        // System prompt update — no hot-path logging
         await api.updateInternSystemPrompt({ intern: activeIntern, cwd })
       }
 
@@ -328,7 +329,7 @@ export function useChat(): UseChatReturn {
                     sentences.forEach((sentence) => {
                       const trimmed = sentence.trim()
                       if (trimmed && spokenSentences < MAX_SPOKEN_SENTENCES) {
-                        console.log('[useChat] Streaming TTS:', trimmed.substring(0, 50))
+                        // TTS streaming — no hot-path logging
                         const speakEvent = new CustomEvent('ai-response', { detail: trimmed })
                         window.dispatchEvent(speakEvent)
                         spokenSentences++
@@ -441,10 +442,8 @@ export function useChat(): UseChatReturn {
               // Summarize to 1-2 sentences before speaking
               const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0)
               const summary = sentences.slice(0, 2).join('. ')
-              console.log('[useChat] Dispatching TTS event with summary:', summary.substring(0, 100))
               const speakEvent = new CustomEvent('ai-response', { detail: summary })
               window.dispatchEvent(speakEvent)
-              console.log('[useChat] TTS event dispatched')
             } catch (e) {
               console.error('[useChat] TTS error:', e)
             }
@@ -548,7 +547,7 @@ export function useChat(): UseChatReturn {
       const api = window.electronAPI
       if (api?.updateInternSystemPrompt) {
         const agentState = (window as any).agentLoopState
-        const activeIntern = agentState?.activeIntern || 'sora'
+        const activeIntern = agentState?.activeIntern || DEFAULT_INTERN_ID
         api.updateInternSystemPrompt(activeIntern).catch((err) => {
           console.error('[useChat] Failed to update system prompt:', err)
         })

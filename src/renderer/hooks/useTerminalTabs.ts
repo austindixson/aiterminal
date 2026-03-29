@@ -320,16 +320,19 @@ export function useTerminalTabs(): UseTerminalTabsReturn {
   // Create initial tab on mount
   // -------------------------------------------------------------------------
 
+  const initializedRef = useRef(false)
   useEffect(() => {
-    if (tabs.length === 0) {
+    if (!initializedRef.current && tabs.length === 0) {
+      initializedRef.current = true
       createTab()
     }
-  }, [])
+  }, [createTab])
 
   // -------------------------------------------------------------------------
   // Listen for CWD changes from main process
   // -------------------------------------------------------------------------
 
+  // Subscribe to CWD changes once — use refs inside callback so deps stay empty
   useEffect(() => {
     const hasElectronAPI =
       typeof window !== 'undefined' &&
@@ -339,14 +342,14 @@ export function useTerminalTabs(): UseTerminalTabsReturn {
     if (!hasElectronAPI) return
 
     const unsubscribe = window.electronAPI.onSessionCwdChanged((data: { sessionId: string; cwd: string }) => {
-      // Find the tab associated with this session
+      // Use ref to find tab — avoids re-subscribing on every tab state change
       const tabId = Array.from(tabToSessionMapRef.current.entries())
         .find(([, sessionId]) => sessionId === data.sessionId)?.[0]
 
       if (tabId) {
         setTabs((prev) =>
           prev.map((t) =>
-            t.id === tabId ? { ...t, cwd: data.cwd } : t
+            t.id === tabId && t.type === 'terminal' ? { ...t, cwd: data.cwd } : t
           )
         )
       }
@@ -355,7 +358,8 @@ export function useTerminalTabs(): UseTerminalTabsReturn {
     return () => {
       unsubscribe()
     }
-  }, [tabs])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- tabToSessionMapRef is a stable ref
+  }, [])
 
   // -------------------------------------------------------------------------
   // Update tab with agent activity (called by AgentMode)

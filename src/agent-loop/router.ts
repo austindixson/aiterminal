@@ -265,6 +265,13 @@ export class AgentLoopRouter extends EventEmitter {
   }
 
   /**
+   * Get IDs of currently active runs.
+   */
+  getActiveRunIds(): string[] {
+    return Array.from(this.activeRuns.keys());
+  }
+
+  /**
    * Resolve workspace path for an intern.
    */
   private resolveInternWorkspace(

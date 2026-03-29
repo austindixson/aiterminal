@@ -478,7 +478,11 @@ export function setupAllHandlers(
 
   // Update session cwd (called by renderer after cd command)
   ipc.on('update-session-cwd', (_event, sessionId: string, cwd: string) => {
-    getSessionManager()?.updateSessionCwd(sessionId, cwd);
+    // Validate CWD exists before updating
+    const fs = require('node:fs');
+    if (cwd && typeof cwd === 'string' && fs.existsSync(cwd)) {
+      getSessionManager()?.updateSessionCwd(sessionId, cwd);
+    }
   });
 
   // ---------------------------------------------------------------------------

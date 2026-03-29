@@ -115,8 +115,10 @@ ipcMain.handle('agent:start', async (_event, request) => {
   // Run in background
   const router = getAgentLoopRouter();
 
-  // Listen for events and forward to renderer
+  // Listen for events and forward to renderer — guard by runId to prevent doubling
   const eventListener = (evt: AgentEvent) => {
+    const evtRunId = 'runId' in evt.data ? (evt.data as { runId?: string }).runId : undefined;
+    if (evtRunId && evtRunId !== runId) return;
     const mainWindow = getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('agent:event', evt);
@@ -199,9 +201,9 @@ ipcMain.handle('agent:abort', async (_event, request) => {
  * Get status of active agent runs.
  */
 ipcMain.handle('agent:status', async () => {
-  // TODO: Implement active run tracking
+  const router = getAgentLoopRouter();
   return {
     success: true,
-    activeRuns: [] // Placeholder
+    activeRuns: router.getActiveRunIds(),
   };
 });
