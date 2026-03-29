@@ -142,6 +142,16 @@ const glm45Air: ModelConfig = {
   contextWindow: 131_072,
 };
 
+const glm47Flash: ModelConfig = {
+  id: 'z-ai/glm-4.7-flash',
+  name: 'GLM-4.7 Flash',
+  provider: 'z-ai',
+  inputCostPer1M: 0.1,
+  outputCostPer1M: 0.1,
+  maxTokens: 16384,
+  contextWindow: 131_072,
+};
+
 // ---------------------------------------------------------------------------
 // Exported registry  (keyed by OpenRouter model ID)
 // ---------------------------------------------------------------------------
@@ -160,6 +170,7 @@ export const MODELS: ReadonlyMap<string, ModelConfig> = new Map<string, ModelCon
   [nemotronSuper.id, nemotronSuper],
   [qwen3CoderNext.id, qwen3CoderNext],
   [glm45Air.id, glm45Air],
+  [glm47Flash.id, glm47Flash],
 ]);
 
 /**
