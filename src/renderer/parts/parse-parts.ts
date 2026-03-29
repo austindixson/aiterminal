@@ -34,8 +34,8 @@ export type MessagePartV2 = TextPartV2 | ToolPartV2 | ReasoningPartV2
 // Pattern: [TOOL:name key="value" key2="value2"]
 const TOOL_TAG_RE = /\[TOOL:(\w+)\s*((?:\w+="[^"]*"\s*)*)\]/g
 
-// Pattern: <thinking>content</thinking>
-const THINKING_RE = /<thinking>([\s\S]*?)<\/thinking>/g
+// Pattern: <thinking>content</thinking> or <think>content</think> (QWen3 Coder)
+const THINKING_RE = /<(?:thinking|think)>([\s\S]*?)<\/(?:thinking|think)>/g
 
 // Legacy emoji patterns
 const LEGACY_EXEC_RE = /⚡ Executed: `([^`]+)`/g

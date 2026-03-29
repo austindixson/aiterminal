@@ -51,6 +51,9 @@ function stripAllToolTags(text: string): string {
     // Non-standard tag variants (budget model hallucinations)
     .replace(/\{(?:READ|exec|RUN|EDIT|FILE):[^}]*\}?/gi, '')
     .replace(/\(voice\)\s*"[^"]*"/g, '')
+    // Thinking/reasoning tags — strip the tags but KEEP the content visible
+    .replace(/<\/?think>/g, '')
+    .replace(/<\/?thinking>/g, '')
     .replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|$)/g, '')
     .replace(/<tool_call>[^\n]*/g, '')
     .replace(/<function[\s\S]*?(?:<\/function>|$)/g, '')
@@ -387,6 +390,9 @@ function summarizeForTTS(accumulated: string): string {
     .replace(/Dependencies:[^\n]*/g, '')
     .replace(/Available CLI[^\n]*/g, '')
     .replace(/How to Customize:[^\n]*/g, '')
+    // Thinking/reasoning tags — strip the tags but KEEP the content visible
+    .replace(/<\/?think>/g, '')
+    .replace(/<\/?thinking>/g, '')
     .replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|$)/g, '')
     .replace(/<tool_call>[^\n]*/g, '')
     .replace(/<function[\s\S]*?(?:<\/function>|$)/g, '')
