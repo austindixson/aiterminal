@@ -278,6 +278,8 @@ export function useChat(): UseChatReturn {
   const [pendingFileOps, setPendingFileOps] = useState<ReadonlyArray<FileOperation>>([])
   const [chatMode, setChatMode] = useState<ChatMode>('normal')
   const pendingSendRef = useRef<((msg: string) => Promise<void>) | null>(null)
+  // Persistent file context — survives message window eviction
+  const fileContextRef = useRef<Map<string, string>>(new Map())
   const sessionHistory = useSessionHistory()
   const agentLoopActiveRef = useRef(false)
   const agentLoopIterationsRef = useRef(0)
@@ -410,6 +412,11 @@ export function useChat(): UseChatReturn {
         .map((f) => `[File: ${f.name}]\n${f.content}`)
         .join('\n\n')
 
+      // Persistent file context — files previously read that may have fallen out of message window
+      const persistentFiles = Array.from(fileContextRef.current.entries())
+        .map(([path, content]) => `[Previously read: ${path}]\n${content}`)
+        .join('\n\n')
+
       // Apply mode prefix
       const modePrefix = chatMode === 'plan'
         ? '[PLAN MODE] Describe what changes you would make and why, but do NOT use [FILE], [EDIT], or [DELETE] tags. Only analyze and explain your plan.\n\n'
@@ -417,8 +424,9 @@ export function useChat(): UseChatReturn {
         ? '[AUTOCODE MODE] You have full autonomy. DO NOT suggest actions — TAKE them directly. Use [READ:path] to read files, [EDIT:path] to fix code, [RUN]command[/RUN] to execute commands. Act immediately without asking permission. If you find errors, read the file, fix it, and verify. Never say "you should" — just do it.\n\n'
         : ''
 
-      const fullPrompt = modePrefix + (fileContext
-        ? `${fileContext}\n\n${trimmed}`
+      const allContext = [persistentFiles, fileContext].filter(Boolean).join('\n\n')
+      const fullPrompt = modePrefix + (allContext
+        ? `${allContext}\n\n${trimmed}`
         : trimmed)
 
       // Clear attachments after sending
@@ -613,9 +621,10 @@ export function useChat(): UseChatReturn {
                 try {
                   const result = await window.electronAPI.readFile(readOp.filePath)
                   if (result.content) {
+                    // Store in persistent file context (survives message window eviction)
+                    fileContextRef.current.set(readOp.filePath, result.content.slice(0, 5000))
                     const lines = result.content.split('\n').length
                     const size = result.content.length
-                    // Compact file read indicator (content is in AI context, not displayed)
                     const fileMsg = createAssistantMessage(
                       `📄 Read **${readOp.filePath}** — ${lines} lines, ${Math.round(size / 1024)}KB`,
                     )
