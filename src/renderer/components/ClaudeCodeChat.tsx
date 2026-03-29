@@ -597,7 +597,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   messageRight: {
     flexDirection: 'column' as const,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
 
   messageMeta: {
@@ -623,7 +623,7 @@ const styles: Record<string, React.CSSProperties> = {
   messageBubble: {
     display: 'flex',
     gap: '8px',
-    maxWidth: '85%',
+    width: '100%',
     overflow: 'hidden',
     minWidth: 0,
   },
