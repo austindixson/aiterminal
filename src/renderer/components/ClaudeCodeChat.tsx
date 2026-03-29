@@ -25,6 +25,8 @@ interface ClaudeCodeChatProps {
   onRejectFileOps?: () => void;
   chatMode?: ChatMode;
   onCycleChatMode?: () => void;
+  onStopAgentLoop?: () => void;
+  isAgentLooping?: boolean;
 }
 
 /**
@@ -51,6 +53,8 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
   onRejectFileOps,
   chatMode = 'normal',
   onCycleChatMode,
+  onStopAgentLoop,
+  isAgentLooping = false,
 }) => {
   const [input, setInput] = useState('');
   const [isMultiline, setIsMultiline] = useState(false);
@@ -332,6 +336,26 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
           ...styles.prompt,
           ...(isWaitingForPermissions ? { opacity: 0.3 } : {})
         }}>▶</span>
+        {isAgentLooping && onStopAgentLoop && (
+          <button
+            onClick={onStopAgentLoop}
+            style={{
+              padding: '2px 8px',
+              borderRadius: '4px',
+              border: '1px solid rgba(255, 50, 50, 0.5)',
+              background: 'rgba(255, 50, 50, 0.15)',
+              color: '#ff5555',
+              fontSize: '10px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              letterSpacing: '0.05em',
+              marginRight: '4px',
+            }}
+            title="Stop agent loop"
+          >
+            STOP
+          </button>
+        )}
         {chatMode !== 'normal' && (
           <button
             onClick={onCycleChatMode}

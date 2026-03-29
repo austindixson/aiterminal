@@ -130,6 +130,8 @@ export interface UseChatReturn {
   readonly approveFileOps: () => Promise<void>
   readonly rejectFileOps: () => void
   readonly cycleChatMode: () => void
+  readonly stopAgentLoop: () => void
+  readonly isAgentLooping: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -219,6 +221,9 @@ export function useChat(): UseChatReturn {
   const [pendingFileOps, setPendingFileOps] = useState<ReadonlyArray<FileOperation>>([])
   const [chatMode, setChatMode] = useState<ChatMode>('normal')
   const pendingSendRef = useRef<((msg: string) => Promise<void>) | null>(null)
+  const agentLoopActiveRef = useRef(false)
+  const agentLoopIterationsRef = useRef(0)
+  const MAX_AGENT_ITERATIONS = 10
 
   const cycleChatMode = useCallback(() => {
     setChatMode(prev => {
@@ -305,6 +310,15 @@ export function useChat(): UseChatReturn {
     async (content: string, modelOverride?: string) => {
       const trimmed = content.trim()
       if (trimmed.length === 0) return
+
+      // Start agent loop in autocode mode
+      if (chatMode === 'autocode') {
+        agentLoopActiveRef.current = true
+        // Reset iterations on new user-initiated message (not auto-continuations)
+        if (!trimmed.startsWith('Read:') && !trimmed.startsWith('Applied edits') && !trimmed.startsWith('Output from') && !trimmed.startsWith('Terminal output')) {
+          agentLoopIterationsRef.current = 0
+        }
+      }
 
       // Update system prompt with active intern + CWD before sending
       const api = window.electronAPI
@@ -521,7 +535,6 @@ export function useChat(): UseChatReturn {
                     const result = await applyOperation(op)
                     if (result.success) {
                       if (op.searchText != null) {
-                        // Show diff for search/replace edits
                         results.push(`✅ **${op.filePath}**\n\`\`\`diff\n${op.searchText.split('\n').map(l => '- ' + l).join('\n')}\n${(op.replaceText || '').split('\n').map(l => '+ ' + l).join('\n')}\n\`\`\``)
                       } else {
                         results.push(`✅ ${op.type} ${op.filePath}`)
@@ -534,6 +547,33 @@ export function useChat(): UseChatReturn {
                   setMessages((prev) => [...prev, summaryMsg].slice(-MAX_MESSAGES))
                 } else {
                   setPendingFileOps(writeOps)
+                }
+              }
+
+              // Stop agent loop if AI signals completion or no operations
+              if (chatMode === 'autocode' && operations.length === 0) {
+                // No tool tags in response — AI is done or just talking
+                if (/\bcomplete\b|\bdone\b|\bfinished\b/i.test(accumulated)) {
+                  agentLoopActiveRef.current = false
+                }
+              }
+
+              // Autocode agent loop: auto-continue if operations were performed
+              if (chatMode === 'autocode' && agentLoopActiveRef.current && operations.length > 0) {
+                agentLoopIterationsRef.current++
+                if (agentLoopIterationsRef.current < MAX_AGENT_ITERATIONS) {
+                  // Brief delay then continue
+                  setTimeout(() => {
+                    if (agentLoopActiveRef.current) {
+                      const readFiles = readOps.map(op => op.filePath).join(', ')
+                      const editFiles = writeOps.map(op => op.filePath).join(', ')
+                      const context = [
+                        readFiles ? `Read: ${readFiles}` : '',
+                        editFiles ? `Applied edits to: ${editFiles}` : '',
+                      ].filter(Boolean).join('. ')
+                      pendingSendRef.current?.(`${context}. Continue — what's the next step? If done, say "Complete."`)
+                    }
+                  }, 500)
                 }
               }
             }
@@ -710,5 +750,10 @@ export function useChat(): UseChatReturn {
     approveFileOps,
     rejectFileOps,
     cycleChatMode,
+    stopAgentLoop: useCallback(() => {
+      agentLoopActiveRef.current = false
+      agentLoopIterationsRef.current = 0
+    }, []),
+    isAgentLooping: isStreaming && agentLoopActiveRef.current,
   }
 }

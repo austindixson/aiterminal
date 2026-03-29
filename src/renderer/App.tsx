@@ -995,6 +995,8 @@ export const App: FC = () => {
                 onRejectFileOps={chat.rejectFileOps}
                 chatMode={chat.state.chatMode}
                 onCycleChatMode={chat.cycleChatMode}
+                onStopAgentLoop={chat.stopAgentLoop}
+                isAgentLooping={chat.isAgentLooping}
                 onSendMessage={async (text) => {
                   await chat.sendMessage(text)
                 }}
