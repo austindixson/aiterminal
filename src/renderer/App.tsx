@@ -1113,7 +1113,12 @@ export const App: FC = () => {
                           content: m.text,
                           timestamp: m.timestamp,
                         }))
-                      : [...chat.state.messages]
+                      : speechBubbles.bubbles.map((b, i) => ({
+                          id: b.id || `bubble-${i}`,
+                          role: 'assistant' as const,
+                          content: b.message,
+                          timestamp: b.timestamp,
+                        }))
                     }
                     onSendMessage={rpMode
                       ? (msg) => elevenAgent.sendText(msg)
