@@ -6,7 +6,7 @@
  * All state updates are immutable.
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { MODELS } from '@/ai/models'
 import type { ChatMessage, ChatMode, ChatState, FileAttachment } from '@/types/chat'
 import type { FileOperation } from '@/types/agent'
@@ -133,6 +133,32 @@ export interface UseChatReturn {
 }
 
 // ---------------------------------------------------------------------------
+// PTY output capture — listens for terminal output after a command
+// ---------------------------------------------------------------------------
+
+function capturePtyOutput(sessionId: string, _cmd: string, durationMs: number): Promise<string> {
+  return new Promise((resolve) => {
+    let output = ''
+    const api = window.electronAPI
+    if (!api?.onSessionData) {
+      resolve('')
+      return
+    }
+
+    const unsub = api.onSessionData(sessionId, (data: string) => {
+      output += data
+    })
+
+    setTimeout(() => {
+      unsub()
+      // Strip ANSI escape codes for clean text
+      const clean = output.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r/g, '')
+      resolve(clean)
+    }, durationMs)
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -149,6 +175,7 @@ export function useChat(): UseChatReturn {
   const [activePresetLabel, setActivePresetLabel] = useState<string | undefined>(undefined)
   const [pendingFileOps, setPendingFileOps] = useState<ReadonlyArray<FileOperation>>([])
   const [chatMode, setChatMode] = useState<ChatMode>('normal')
+  const pendingSendRef = useRef<((msg: string) => Promise<void>) | null>(null)
 
   const cycleChatMode = useCallback(() => {
     setChatMode(prev => {
@@ -295,11 +322,24 @@ export function useChat(): UseChatReturn {
             text = text.replace(/\[RUN\].*?\[\/RUN\]/gs, '').trim()
 
             if (chatMode === 'autocode') {
-              // AUTOCODE: execute commands in the active terminal
+              // AUTOCODE: execute commands in the active terminal and capture output
               const sessionId = (window as any).agentLoopState?.activeSessionId as string | undefined
               for (const cmd of commands) {
                 if (sessionId && window.electronAPI?.writeToSession) {
                   window.electronAPI.writeToSession(sessionId, cmd + '\r')
+
+                  // Capture PTY output and feed back to AI for analysis
+                  capturePtyOutput(sessionId, cmd, 5000).then(output => {
+                    if (output.trim().length > 0) {
+                      // Auto-send captured output as follow-up for AI to analyze
+                      const truncated = output.length > 3000
+                        ? output.slice(-3000) + '\n... (truncated)'
+                        : output
+                      const followUp = `Terminal output from \`${cmd}\`:\n\`\`\`\n${truncated}\n\`\`\`\nAnalyze these results.`
+                      // Use sendMessage recursively (will be defined in outer scope)
+                      pendingSendRef.current?.(followUp)
+                    }
+                  })
                 }
                 text = text
                   ? `⚡ Executed: \`${cmd}\`\n\n${text}`
@@ -482,6 +522,9 @@ export function useChat(): UseChatReturn {
     },
     [attachedFiles, messages, chatMode],
   )
+
+  // Keep ref in sync so PTY capture callback can call sendMessage
+  pendingSendRef.current = sendMessage
 
   // -------------------------------------------------------------------------
   // @mention extraction
