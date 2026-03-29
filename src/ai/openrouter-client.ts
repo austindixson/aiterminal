@@ -26,7 +26,7 @@ import { getPreset } from './presets';
 // ---------------------------------------------------------------------------
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
-const DEFAULT_MAX_TOKENS = 4096;
+const DEFAULT_MAX_TOKENS = 8192;
 
 // ---------------------------------------------------------------------------
 // Pure helper: map TaskType → RouterPreset field
