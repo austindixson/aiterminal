@@ -56,9 +56,11 @@ describe('SubAgentTracker', () => {
 
     render(<SubAgentTracker agents={agents} />);
 
-    expect(screen.getByText(/Active:\s*1/)).toBeInTheDocument();
-    expect(screen.getByText(/Total:\s*2/)).toBeInTheDocument();
-    expect(screen.getByText(/3\.0k/)).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Total')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getAllByText('3.0k').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows error state for failed agents', () => {

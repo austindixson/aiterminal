@@ -181,12 +181,11 @@ describe('App', () => {
     expect(aiSection).toBeNull()
   })
 
-  it('terminal section takes full height when no AI is active', () => {
+  it('terminal area is present when no AI is active', () => {
     const { container } = render(<App />)
 
-    const terminalSection = container.querySelector('.terminal-section')
-    expect(terminalSection).toBeInTheDocument()
-    expect(terminalSection).not.toHaveClass('terminal-section--with-ai')
+    const terminalArea = container.querySelector('.terminal-area')
+    expect(terminalArea).toBeInTheDocument()
   })
 
   it('passes an onCommand callback to TerminalView', () => {

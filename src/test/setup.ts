@@ -90,6 +90,24 @@ vi.mock('node-pty', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Mock: @elevenlabs/react
+// ---------------------------------------------------------------------------
+// The package's internal dist graph requires BaseConversation which doesn't
+// resolve in jsdom. Provide a minimal mock of the only export we use.
+
+vi.mock('@elevenlabs/react', () => ({
+  useConversation: vi.fn().mockReturnValue({
+    status: 'disconnected',
+    isSpeaking: false,
+    startSession: vi.fn().mockResolvedValue(undefined),
+    endSession: vi.fn().mockResolvedValue(undefined),
+    sendUserMessage: vi.fn(),
+    sendContextualUpdate: vi.fn(),
+    getId: vi.fn().mockReturnValue(null),
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Helpers: Mock factories (importable from setup)
 // ---------------------------------------------------------------------------
 
