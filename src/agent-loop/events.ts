@@ -134,6 +134,8 @@ export interface AgentLoopConfig {
     requireSources: boolean;
     requireReview: boolean;
   };
+  /** AI query function for interns that need LLM access (e.g., Hana) */
+  aiQuery?: (prompt: string) => Promise<string>;
 }
 
 /**

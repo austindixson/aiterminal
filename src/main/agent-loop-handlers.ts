@@ -11,6 +11,33 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import type { AgentLoopConfig, AgentEvent } from '../agent-loop/events.js';
 import { getAgentLoopRouter } from '../agent-loop/router.js';
+import type { IAIClient } from '../ai/client.js';
+
+/**
+ * Shared AI client reference for agent interns.
+ * Set via setAgentAIClient() from main.ts after initialization.
+ */
+let agentAIClient: IAIClient | null = null;
+
+export function setAgentAIClient(client: IAIClient): void {
+  agentAIClient = client;
+}
+
+/**
+ * Create an aiQuery function that uses the shared AI client.
+ */
+function createAiQueryFn(): ((prompt: string) => Promise<string>) | undefined {
+  if (!agentAIClient) return undefined;
+  const client = agentAIClient;
+  return async (prompt: string): Promise<string> => {
+    const response = await client.query({
+      prompt,
+      taskType: 'general',
+      context: [],
+    });
+    return response.content ?? '';
+  };
+}
 
 /**
  * Get the main browser window (for IPC forwarding).
@@ -59,7 +86,8 @@ ipcMain.handle('agent:start', async (_event, request) => {
       requireTests: config.qualityGates?.requireTests ?? true,
       requireSources: config.qualityGates?.requireSources ?? true,
       requireReview: config.qualityGates?.requireReview ?? false
-    }
+    },
+    aiQuery: createAiQueryFn(),
   };
 
   // Run in background

@@ -158,26 +158,13 @@ Return only the improved content without explanations.`;
   }
 
   /**
-   * Call LLM for content generation.
+   * Call LLM for content generation via the injected aiQuery function.
    */
   private async callLLM(prompt: string): Promise<string> {
-    try {
-      // For now, return a structured response
-      // In production, this would call OpenRouter or another LLM API
-      let response = `# Generated Content\n\n`;
-      response += `This is a placeholder for LLM-generated content.\n\n`;
-      response += `**Task**: ${this.config.task}\n\n`;
-      response += `To enable real content generation:\n`;
-      response += `1. Set OPENROUTER_API_KEY in .env\n`;
-      response += `2. Integrate with OpenRouter client\n`;
-      response += `3. Add streaming support for real-time generation\n\n`;
-      response += `**Prompt used**:\n${prompt.substring(0, 200)}...\n`;
-
-      return response;
-
-    } catch (error) {
-      throw new Error(`Content generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    if (!this.config.aiQuery) {
+      throw new Error('Hana requires an aiQuery function in config. Set OPENROUTER_API_KEY and pass aiQuery to InternSessionConfig.');
     }
+    return await this.config.aiQuery(prompt);
   }
 
   /**

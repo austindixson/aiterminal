@@ -235,13 +235,14 @@ export function useChat(): UseChatReturn {
       const trimmed = content.trim()
       if (trimmed.length === 0) return
 
-      // Update system prompt with active intern before sending
+      // Update system prompt with active intern + CWD before sending
       const api = window.electronAPI
       if (api?.updateInternSystemPrompt) {
         const agentState = (window as any).agentLoopState
         const activeIntern = agentState?.activeIntern || 'sora'
-        console.log('[useChat] Sending message, updating system prompt for intern:', activeIntern)
-        await api.updateInternSystemPrompt(activeIntern)
+        const cwd = agentState?.cwd as string | undefined
+        console.log('[useChat] Updating system prompt for intern:', activeIntern, 'cwd:', cwd)
+        await api.updateInternSystemPrompt({ intern: activeIntern, cwd })
       }
 
       // Create user message with current attachments

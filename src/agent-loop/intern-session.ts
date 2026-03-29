@@ -24,6 +24,8 @@ export interface InternSessionConfig {
   runId: string;
   sessionId: string;
   contextFromHandoff?: HandoffContext;
+  /** Optional AI query function for interns that need LLM access */
+  aiQuery?: (prompt: string) => Promise<string>;
 }
 
 /**

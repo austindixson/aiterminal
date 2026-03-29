@@ -33,6 +33,7 @@ import { TerminalSessionManager } from './terminal-session-manager.js';
 import { DaemonBridge, registerDaemonIpc } from './daemon-bridge.js';
 import { buildInternSystemPrompt } from '../intern-config.js';
 import './agent-loop-handlers.js';
+import { setAgentAIClient } from './agent-loop-handlers.js';
 import './transcript-handlers.js';
 
 // ---------------------------------------------------------------------------
@@ -235,6 +236,9 @@ app.whenReady().then(() => {
   // create a stub that returns helpful error messages.
   const client = aiClient ?? createStubAIClient();
 
+  // Make AI client available to agent loop interns (Hana needs LLM access)
+  setAgentAIClient(client);
+
   const sessionManager = new TerminalSessionManager(window);
   sessionManagerRef.current = sessionManager;
 
@@ -257,7 +261,7 @@ app.whenReady().then(() => {
       if (cwd) {
         try {
           const { readDirectoryTree: readTree } = await import('../file-tree/file-tree-service.js');
-          const tree = await readTree(cwd, 2);
+          const tree = await readTree(cwd, 3);
           const treeStr = formatTreeForPrompt(tree as ReadonlyArray<TreeEntry>);
           basePrompt += `\n\nWORKING DIRECTORY: ${cwd}\nPROJECT STRUCTURE:\n${treeStr}`;
         } catch {

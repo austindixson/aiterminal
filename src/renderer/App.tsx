@@ -116,26 +116,13 @@ export const App: FC = () => {
 
   useEffect(() => {
     const handleAIResponse = (event: any) => {
-      voiceSpeakRef.current(event.detail).catch(() => {})
+      if (ttsEnabledRef.current) {
+        voiceSpeakRef.current(event.detail).catch(() => {})
+      }
     }
     window.addEventListener('ai-response', handleAIResponse)
     return () => window.removeEventListener('ai-response', handleAIResponse)
   }, [])
-
-  // Expose active intern globally for chat to access
-  // Initialize immediately (synchronous) so it's available before first render
-  ;(window as any).agentLoopState = {
-    activeIntern: agentLoop.activeIntern || 'sora',
-    enabled: agentLoop.enabled
-  }
-
-  // Update when values change
-  useEffect(() => {
-    (window as any).agentLoopState = {
-      activeIntern: agentLoop.activeIntern || 'sora',
-      enabled: agentLoop.enabled
-    }
-  }, [agentLoop.activeIntern, agentLoop.enabled])
 
   // Auto-open chat when Claude Code is detected
   useEffect(() => {
@@ -157,6 +144,9 @@ export const App: FC = () => {
   // RP Mode: fullscreen VRM with ElevenLabs conversational agent
   const [rpMode, setRpMode] = useState(false)
   const elevenAgent = useElevenLabsAgent()
+
+  // TTS toggle: mute/unmute text-to-speech
+  const [ttsEnabled, setTtsEnabled] = useState(true)
 
   // TUI Mode: disable natural language interception for CLI tools
   const [tuiMode, setTuiMode] = useState(false)
@@ -180,6 +170,19 @@ export const App: FC = () => {
     const activeTab = terminalTabs.state.tabs.find(t => t.isActive)
     return activeTab?.cwd || ''
   }, [terminalTabs.state.tabs])
+
+  // TTS gating ref (used in event listener closures)
+  const ttsEnabledRef = useRef(ttsEnabled)
+  ttsEnabledRef.current = ttsEnabled
+
+  // Expose active intern + CWD globally for chat to access
+  useEffect(() => {
+    (window as any).agentLoopState = {
+      activeIntern: agentLoop.activeIntern || 'sora',
+      enabled: agentLoop.enabled,
+      cwd: activeTabCwd,
+    }
+  }, [agentLoop.activeIntern, agentLoop.enabled, activeTabCwd])
 
   // Refresh cwd when switching tabs (probes real shell cwd from PTY pid)
   useEffect(() => {
@@ -216,10 +219,12 @@ export const App: FC = () => {
     minCommentInterval: 180000, // 3 minutes between comments
     cwd: activeTabCwd,
     onComment: (comment) => {
-      // Speak the comment via TTS
-      voice.speak(comment).catch((err) => {
-        console.error('[App] Failed to speak Claude Code comment:', err)
-      })
+      // Speak the comment via TTS (if enabled)
+      if (ttsEnabled) {
+        voice.speak(comment).catch((err) => {
+          console.error('[App] Failed to speak Claude Code comment:', err)
+        })
+      }
       // Also add as speech bubble
       speechBubbles.addBubble(comment)
     },
@@ -1039,6 +1044,8 @@ export const App: FC = () => {
                       await elevenAgent.stop()
                     }
                   }}
+                  ttsEnabled={ttsEnabled}
+                  onToggleTts={() => setTtsEnabled(prev => !prev)}
                   activeModel={rpMode
                     ? `ElevenLabs Agent ${elevenAgent.status === 'connected' ? '(live)' : `(${elevenAgent.status})`}`
                     : (chat.state.activeModelLabel || undefined)

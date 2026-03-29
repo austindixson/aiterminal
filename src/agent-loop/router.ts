@@ -67,7 +67,8 @@ export class AgentLoopRouter extends EventEmitter {
         transcriptDb: config.transcriptDb,
         abortSignal: abortController.signal,
         runId: config.runId,
-        sessionId: config.sessionId
+        sessionId: config.sessionId,
+        aiQuery: config.aiQuery,
       });
 
       // Emit start event
@@ -134,7 +135,8 @@ export class AgentLoopRouter extends EventEmitter {
               abortSignal: abortController.signal,
               runId: config.runId,
               sessionId: config.sessionId,
-              contextFromHandoff: event.data
+              contextFromHandoff: event.data,
+              aiQuery: config.aiQuery,
             });
 
             // Stream from next intern

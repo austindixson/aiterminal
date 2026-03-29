@@ -79,6 +79,9 @@ interface InternAvatarProps {
   rpMode?: boolean;
   onToggleRpMode?: () => void;
   activeModel?: string;
+  // TTS toggle
+  ttsEnabled?: boolean;
+  onToggleTts?: () => void;
 }
 
 export function InternAvatar({
@@ -95,6 +98,8 @@ export function InternAvatar({
   rpMode = false,
   onToggleRpMode,
   activeModel,
+  ttsEnabled = true,
+  onToggleTts,
 }: InternAvatarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const vrmRef = useRef<any>(null);
@@ -1284,6 +1289,16 @@ export function InternAvatar({
                 🎭
               </button>
             )
+          )}
+          {onToggleTts && (
+            <button
+              className={`chat-toggle ${ttsEnabled ? 'active' : ''}`}
+              onClick={onToggleTts}
+              title={ttsEnabled ? 'Mute TTS' : 'Unmute TTS'}
+              style={!ttsEnabled ? { opacity: 0.4 } : undefined}
+            >
+              {ttsEnabled ? '🔊' : '🔇'}
+            </button>
           )}
           {onToggleVrmChat && (
             <button
