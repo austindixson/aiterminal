@@ -873,15 +873,17 @@ export function useChat(): UseChatReturn {
                 if (operations.length === 0 && /(?:task|everything|all\s+\w+\s+is)\s+(?:complete|done|finished)|^complete\.?$/im.test(accumulated)) {
                   agentLoopActiveRef.current = false
                 }
-                // Stop if AI response is empty or just filler (arrows, dots, spaces)
-                const strippedContent = accumulated.replace(/\[.*?\]/g, '').replace(/[→←↑↓•·,\s.]+/g, '').trim()
-                if (strippedContent.length === 0) {
+                // Check if the response has any real content (not just tags/filler)
+                const strippedContent = accumulated.replace(/\[.*?\]/g, '').replace(/\[\/?\w*\]?/g, '').replace(/[→←↑↓•·,\s.\[\]\/]+/g, '').trim()
+                // Only stop if truly empty AND no tag fragments (tag fragments = model trying to act)
+                const hasTagFragments = /\[/.test(accumulated)
+                if (strippedContent.length === 0 && !hasTagFragments) {
                   agentLoopActiveRef.current = false
                 }
-                // Nudge: if AI produced content but used no tool tags, remind it to act
-                if (operations.length === 0 && !accumulated.includes('[RUN]') && !accumulated.includes('[RUN:') && agentLoopActiveRef.current
-                    && !/\bcomplete\b|\bdone\b|\bfinished\b/i.test(accumulated)
-                    && strippedContent.length > 5) {
+                // Nudge: if AI produced any response but used no COMPLETE tool tags, remind it to act
+                const hasCompleteTags = operations.length > 0 || accumulated.includes('[RUN]') || accumulated.includes('[RUN:')
+                if (!hasCompleteTags && agentLoopActiveRef.current
+                    && !/\bcomplete\b|\bdone\b|\bfinished\b/i.test(accumulated)) {
                   agentLoopIterationsRef.current++
 
                   // After 2 failed nudges, force-escalate to a stronger model
