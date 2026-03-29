@@ -173,6 +173,27 @@ export function parseAgentResponse(
     })
   }
 
+  // Parse bare [filename.ext] patterns (budget model shorthand for READ)
+  // Only match if it looks like a file path (has extension) and wasn't already captured
+  const bareFileRegex = /\[([\w./-]+\.\w{1,6})\]/g
+  const existingPaths = new Set(operations.map(op => op.filePath))
+
+  while ((match = bareFileRegex.exec(aiContent)) !== null) {
+    const filePath = sanitizeFilePath(match[1])
+    if (!filePath || existingPaths.has(filePath)) continue
+    // Skip if it looks like a closing tag fragment
+    if (filePath.startsWith('/')) continue
+
+    existingPaths.add(filePath)
+    operations.push({
+      id: generateId('op'),
+      type: 'read',
+      filePath,
+      description: `Read ${filePath}`,
+      status: 'pending',
+    })
+  }
+
   // Sort operations by their position in the original text for stable ordering
   return sortByPosition(aiContent, operations)
 }

@@ -56,6 +56,8 @@ function stripAllToolTags(text: string): string {
     .replace(/<function[\s\S]*?(?:<\/function>|$)/g, '')
     .replace(/<parameter[\s\S]*?(?:<\/parameter>|$)/g, '')
     .replace(/CAUTION\s*\([^)]*\)/gi, '')
+    // Strip bare [filename.ext] patterns (budget model outputs [README.md] instead of [READ:README.md])
+    .replace(/\[[\w./-]+\.\w{1,6}\]/g, '')
     // Strip filler characters from budget model output (arrows, repeated dots/commas)
     .replace(/[→←↑↓]{2,}/g, '')
     .replace(/\s*[→←]\s*/g, ' ')

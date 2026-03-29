@@ -373,7 +373,6 @@ export function setupAllHandlers(
 
     try {
       const tt = taskType as TaskType;
-      const activeModel = aiClient.getActiveModel(tt);
 
       const aiRequest: AIRequest = {
         prompt,
@@ -381,6 +380,16 @@ export function setupAllHandlers(
         context: context ?? [],
         modelOverride,
       };
+
+      // Resolve the actual model (may escalate for complex prompts)
+      const { resolveModelForTask } = require('../ai/openrouter-client');
+      const actualModelId = modelOverride ?? resolveModelForTask(tt, aiClient.getActivePresetName(), prompt);
+      let actualModelLabel = actualModelId;
+      try {
+        const { getModel } = require('../ai/models');
+        actualModelLabel = getModel(actualModelId)?.name ?? actualModelId;
+      } catch { /* use raw ID */ }
+      console.log(`[IPC] ai-query-stream: model=${actualModelId} (${actualModelLabel})`);
 
       let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
 
@@ -403,8 +412,8 @@ export function setupAllHandlers(
         requestId,
         chunk: '',
         done: true,
-        model: activeModel.id,
-        modelLabel: activeModel.name,
+        model: actualModelId,
+        modelLabel: actualModelLabel,
         usage,
       });
     } catch (error: unknown) {
