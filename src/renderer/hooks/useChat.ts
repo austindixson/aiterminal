@@ -377,10 +377,12 @@ function summarizeForTTS(accumulated: string): string {
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/#{1,6}\s/g, '')
     .replace(/[-*]\s/g, '')
-    // Strip file paths and extensions
+    // Strip file paths, extensions, and path-like strings
     .replace(/\S+\.\w{1,5}\]/g, '')
-    .replace(/\/\S+\.\w{1,5}/g, '')
-    .replace(/\w+\.\w{2,4}(?:\s|$)/g, ' ')
+    .replace(/\/[\w./-]+/g, '')                     // absolute/relative paths: /Users/ghost/file.rs, src/main.rs
+    .replace(/\b[\w-]+\/[\w./-]+/g, '')             // relative paths: src/providers/mod.rs
+    .replace(/\b\w+\.\w{1,5}\b/g, ' ')             // bare filenames: mod.rs, main.py, Cargo.toml
+    .replace(/`[^`]*`/g, '')                        // anything in backticks (often commands/paths)
     // Strip tool output markers
     .replace(/⚡ Executed:[^\n]*/g, '')
     .replace(/📄 Read[^\n]*/g, '')
@@ -776,7 +778,14 @@ export function useChat(): UseChatReturn {
                     const firstSentence = displayText.match(/^[^.!?]+[.!?]/)
                     if (firstSentence) {
                       earlyTTSFired = true
-                      const speech = firstSentence[0].trim()
+                      // Clean paths/filenames from speech — they sound unnatural
+                      const speech = firstSentence[0]
+                        .replace(/\/[\w./-]+/g, 'the file')
+                        .replace(/\b[\w-]+\/[\w./-]+/g, 'the file')
+                        .replace(/`[^`]*`/g, '')
+                        .replace(/\b\w+\.\w{1,5}\b/g, '')
+                        .replace(/\s{2,}/g, ' ')
+                        .trim()
                       if (speech.length > 5 && speech.length < 100) {
                         window.dispatchEvent(new CustomEvent('ai-tts-summary', { detail: speech }))
                       }
