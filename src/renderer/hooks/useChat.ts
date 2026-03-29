@@ -687,24 +687,27 @@ export function useChat(): UseChatReturn {
             text = stripAllToolTags(text)
 
             if (chatMode === 'autocode') {
-              // AUTOCODE: execute commands in the active terminal and capture output
+              // AUTOCODE: execute commands sequentially in the terminal
               const sessionId = getAgentLoopState().activeSessionId
-              for (const cmd of commands) {
-                if (sessionId && window.electronAPI?.writeToSession) {
+              // Run commands one at a time to avoid PTY echo doubling
+              const runSequential = async () => {
+                for (const cmd of commands) {
+                  if (!sessionId || !window.electronAPI?.writeToSession) continue
                   window.electronAPI.writeToSession(sessionId, cmd + '\r')
-
-                  // Capture PTY output and feed back to AI for analysis
-                  capturePtyOutput(sessionId, cmd, 8000).then(output => {
+                  try {
+                    const output = await capturePtyOutput(sessionId, cmd, 15000)
                     if (output.trim().length > 0) {
-                      // Extract only important lines: errors, warnings, test results, summaries
                       const important = extractImportantOutput(output, cmd)
                       if (important.length > 0) {
                         const followUp = `Output from \`${cmd}\`:\n\`\`\`\n${important}\n\`\`\`\nBriefly note the result (pass/fail), then continue with the next step. Do NOT stop here — keep going until the full task is complete.`
                         pendingSendRef.current?.(followUp)
                       }
                     }
-                  })
+                  } catch { /* timeout — continue */ }
                 }
+              }
+              runSequential()
+              for (const cmd of commands) {
                 text = text
                   ? `⚡ Executed: \`${cmd}\`\n\n${text}`
                   : `⚡ Executed: \`${cmd}\``
