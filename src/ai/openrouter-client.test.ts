@@ -86,11 +86,11 @@ describe('OpenRouterClient — getActiveModel', () => {
     vi.clearAllMocks();
   });
 
-  it('"balanced" preset + "command_help" returns QWen3 Coder Next', () => {
+  it('"balanced" preset + "command_help" returns GLM-4.7 Flash', () => {
     const client = new OpenRouterClient(makeConfig({ activePreset: 'balanced' }));
     const model = client.getActiveModel('command_help');
-    expect(model.name).toBe('QWen3 Coder Next');
-    expect(model.id).toBe('qwen/qwen3-coder-next');
+    expect(model.name).toBe('GLM-4.7 Flash');
+    expect(model.id).toBe('z-ai/glm-4.7-flash');
   });
 
   it('"balanced" preset + "code_explain" returns QWen3 Coder Next', () => {
@@ -141,8 +141,8 @@ describe('OpenRouterClient — setPreset', () => {
 
   it('after switching, getActiveModel returns models from new preset', () => {
     const client = new OpenRouterClient(makeConfig({ activePreset: 'balanced' }));
-    // balanced → command_help = QWen3 Coder Next
-    expect(client.getActiveModel('command_help').name).toBe('QWen3 Coder Next');
+    // balanced → command_help = GLM-4.7 Flash
+    expect(client.getActiveModel('command_help').name).toBe('GLM-4.7 Flash');
 
     client.setPreset('budget');
     // budget → command_help = GLM-4.5 Air
@@ -163,7 +163,7 @@ describe('OpenRouterClient — query', () => {
     mockCreate.mockResolvedValueOnce({
       choices: [{ message: { content: 'Use `ls`.' } }],
       usage: { prompt_tokens: 10, completion_tokens: 5 },
-      model: 'qwen/qwen3-coder-next',
+      model: 'z-ai/glm-4.7-flash',
     });
 
     const client = new OpenRouterClient(makeConfig());
@@ -171,7 +171,7 @@ describe('OpenRouterClient — query', () => {
 
     expect(mockCreate).toHaveBeenCalledOnce();
     const callArgs = mockCreate.mock.calls[0][0];
-    expect(callArgs.model).toBe('qwen/qwen3-coder-next');
+    expect(callArgs.model).toBe('z-ai/glm-4.7-flash');
   });
 
   it('includes system prompt in messages', async () => {
@@ -257,7 +257,7 @@ describe('OpenRouterClient — query', () => {
 describe('resolveModelForTask', () => {
   it('command_help maps to commandHelper field', () => {
     const modelId = resolveModelForTask('command_help', 'balanced');
-    expect(modelId).toBe('qwen/qwen3-coder-next');
+    expect(modelId).toBe('z-ai/glm-4.7-flash');
   });
 
   it('code_explain maps to codeExplainer field', () => {

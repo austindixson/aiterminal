@@ -13,12 +13,12 @@ import type { RouterPreset } from './types';
 
 const balanced: RouterPreset = {
   name: 'balanced',
-  description: 'QWen3 Coder Next — escalates to GLM-4.7 Flash for complex tasks.',
-  commandHelper: 'qwen/qwen3-coder-next',
+  description: 'QWen3 Coder Next — escalates to GLM-5 for complex tasks.',
+  commandHelper: 'z-ai/glm-4.7-flash',
   codeExplainer: 'qwen/qwen3-coder-next',
   generalAssistant: 'qwen/qwen3-coder-next',
   errorAnalyzer: 'qwen/qwen3-coder-next',
-  escalationModel: 'z-ai/glm-4.7-flash',
+  escalationModel: 'z-ai/glm-5',
 };
 
 const performance: RouterPreset = {
@@ -45,11 +45,12 @@ const budget: RouterPreset = {
 
 const speed: RouterPreset = {
   name: 'speed',
-  description: 'GLM-4.7 Flash for all tasks — fast and capable.',
+  description: 'GLM-4.7 Flash — escalates to QWen3 Coder for complex tasks.',
   commandHelper: 'z-ai/glm-4.7-flash',
   codeExplainer: 'z-ai/glm-4.7-flash',
   generalAssistant: 'z-ai/glm-4.7-flash',
   errorAnalyzer: 'z-ai/glm-4.7-flash',
+  escalationModel: 'qwen/qwen3-coder-next',
 };
 
 // ---------------------------------------------------------------------------
