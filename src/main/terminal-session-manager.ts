@@ -78,17 +78,21 @@ export class TerminalSessionManager {
    */
   createSession(options: CreateSessionOptions = {}): TerminalSession | null {
     const sessionId = randomUUID();
-    // Use bash explicitly for better compatibility
-    const shell = options.shell || process.env.SHELL || '/bin/bash';
-    // Normalize shell path to absolute, default to bash
-    const absoluteShell = shell.startsWith('/') ? shell : '/bin/bash';
-    const cwd = options.cwd || process.env.HOME || '/';
+    // Cross-platform shell detection
+    const isWin = process.platform === 'win32';
+    const defaultShell = isWin
+      ? (process.env.COMSPEC || 'cmd.exe')
+      : (process.env.SHELL || '/bin/bash');
+    const shell = options.shell || defaultShell;
+    const homeDir = process.env.HOME || process.env.USERPROFILE || (isWin ? 'C:\\' : '/');
+    const cwd = options.cwd || homeDir;
     const cols = options.cols || 80;
     const rows = options.rows || 24;
 
     try {
-      // Spawn PTY with explicit shell as login shell
-      const ptyProcess = pty.spawn(absoluteShell, ['--login'], {
+      // Spawn PTY — login shell on Unix, plain shell on Windows
+      const shellArgs = isWin ? [] : ['--login'];
+      const ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
         cols,
         rows,
@@ -96,9 +100,9 @@ export class TerminalSessionManager {
         env: {
           ...process.env,
           TERM: 'xterm-256color',
-          HOME: process.env.HOME || '/',
-          USER: process.env.USER || 'root',
-          PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+          HOME: homeDir,
+          USER: process.env.USER || process.env.USERNAME || '',
+          PATH: process.env.PATH || '',
         } as Record<string, string>,
       });
 

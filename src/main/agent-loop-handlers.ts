@@ -75,7 +75,7 @@ ipcMain.handle('agent:start', async (_event, request) => {
   const agentConfig: AgentLoopConfig = {
     sessionId,
     runId,
-    workspaceRoot: config.workspaceRoot || `${process.env.HOME}/.interns`,
+    workspaceRoot: config.workspaceRoot || `${process.env.HOME || process.env.USERPROFILE || '.'}/.interns`,
     transcriptDb: config.transcriptDb,
     timeouts: {
       mei: config.timeouts?.mei || defaultTimeout.mei,

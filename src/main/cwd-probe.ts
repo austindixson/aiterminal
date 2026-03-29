@@ -39,6 +39,21 @@ export function resolveCwdFromPid(pid: number): string | null {
         return line.slice(1);
       }
     }
+    if (process.platform === 'win32') {
+      // Use PowerShell to query process working directory
+      const out = execFileSync('powershell.exe', [
+        '-NoProfile', '-Command',
+        `(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).Path | Split-Path -Parent`,
+      ], {
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024,
+      });
+      const cwd = out.trim();
+      if (cwd && existsSync(cwd)) {
+        return cwd;
+      }
+      return null;
+    }
   } catch {
     return null;
   }

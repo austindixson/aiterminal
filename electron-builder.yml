@@ -23,6 +23,30 @@ mac:
         - x64
   darkModeSupport: true
 
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: "${productName}-${version}-setup.${ext}"
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  category: Development
+
 dmg:
   artifactName: "${productName}-${version}-${arch}.${ext}"
 

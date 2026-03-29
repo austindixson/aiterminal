@@ -19,7 +19,7 @@ import type { TerminalTab, FileTab, Tab, TerminalTabsState, TerminalSessionInfo 
 // ---------------------------------------------------------------------------
 
 const MAX_TABS = 10
-const DEFAULT_TAB_NAME = 'zsh'
+const DEFAULT_TAB_NAME = navigator.platform?.startsWith('Win') ? 'cmd' : 'zsh'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -33,7 +33,10 @@ function generateTabId(): string {
 }
 
 function getShellName(shell: string): string {
-  return shell.split('/').pop() || DEFAULT_TAB_NAME
+  // Handle both Unix (/) and Windows (\) path separators
+  const name = shell.split(/[/\\]/).pop() || DEFAULT_TAB_NAME
+  // Strip .exe suffix on Windows
+  return name.replace(/\.exe$/i, '')
 }
 
 // ---------------------------------------------------------------------------

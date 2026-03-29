@@ -5,7 +5,7 @@
   "private": true,
   "main": "dist/main/main/main.js",
   "scripts": {
-    "dev": "tsc -p tsconfig.main.json && NODE_ENV=development npx concurrently \"vite\" \"sleep 2 && electron .\"",
+    "dev": "tsc -p tsconfig.main.json && NODE_ENV=development npx concurrently \"vite\" \"npx wait-on http://localhost:5173 && electron .\"",
     "dev:renderer": "vite",
     "dev:main": "tsc -p tsconfig.main.json && electron .",
     "build": "tsc && vite build",
@@ -52,6 +52,7 @@
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "wait-on": "^9.0.4"
   }
 }
