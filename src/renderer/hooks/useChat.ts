@@ -673,7 +673,7 @@ export function useChat(): UseChatReturn {
                       // Extract only important lines: errors, warnings, test results, summaries
                       const important = extractImportantOutput(output, cmd)
                       if (important.length > 0) {
-                        const followUp = `Output from \`${cmd}\` (key lines only):\n\`\`\`\n${important}\n\`\`\`\nAnalyze the results. Report: status (pass/fail), errors found, and suggested fixes. Be concise.`
+                        const followUp = `Output from \`${cmd}\`:\n\`\`\`\n${important}\n\`\`\`\nBriefly note the result (pass/fail), then continue with the next step. Do NOT stop here — keep going until the full task is complete.`
                         pendingSendRef.current?.(followUp)
                       }
                     }
@@ -712,6 +712,7 @@ export function useChat(): UseChatReturn {
             let accumulated = ''
             let repetitionCount = 0
             let lastChunkPattern = ''
+            let earlyTTSFired = false
 
             await api.aiQueryStream(
               { prompt: fullPrompt, taskType: 'general', context, modelOverride },
@@ -745,6 +746,18 @@ export function useChat(): UseChatReturn {
                   }
 
                   const displayText = stripAllToolTags(accumulated)
+
+                  // Early TTS: speak the first sentence as soon as it's complete
+                  if (!earlyTTSFired && !_hidden && displayText.length > 10) {
+                    const firstSentence = displayText.match(/^[^.!?]+[.!?]/)
+                    if (firstSentence) {
+                      earlyTTSFired = true
+                      const speech = firstSentence[0].trim()
+                      if (speech.length > 5 && speech.length < 100) {
+                        window.dispatchEvent(new CustomEvent('ai-tts-summary', { detail: speech }))
+                      }
+                    }
+                  }
 
                   setMessages((prev) =>
                     prev.map((m) =>
@@ -783,8 +796,8 @@ export function useChat(): UseChatReturn {
               },
             )
 
-            // Dispatch summarized TTS only for user-initiated messages (not auto-continuations)
-            if (!_hidden) {
+            // Dispatch summarized TTS only if early TTS didn't already speak
+            if (!_hidden && !earlyTTSFired) {
               const ttsSummary = summarizeForTTS(accumulated)
               if (ttsSummary.length > 0) {
                 window.dispatchEvent(new CustomEvent('ai-tts-summary', { detail: ttsSummary }))
