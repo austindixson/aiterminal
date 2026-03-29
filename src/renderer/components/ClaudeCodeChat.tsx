@@ -57,25 +57,39 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const userScrolledUpRef = useRef(false);
+  const autoScrollRef = useRef(true);
+  const programmaticScrollRef = useRef(false);
 
   // Local message state for Claude Code mode (bubbles without triggering OpenRouter)
   const [localMessages, setLocalMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 
-  // Track if user has manually scrolled up
+  // Detect user scroll: if user scrolls up, disable auto-scroll.
+  // If user scrolls back to bottom, re-enable it.
   const handleMessagesScroll = () => {
+    // Ignore scroll events we caused programmatically
+    if (programmaticScrollRef.current) {
+      programmaticScrollRef.current = false;
+      return;
+    }
     const el = messagesContainerRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    userScrolledUpRef.current = distanceFromBottom > 100;
+    // User scrolled up — stop auto-scrolling
+    if (distanceFromBottom > 150) {
+      autoScrollRef.current = false;
+    }
+    // User scrolled back to bottom — resume auto-scrolling
+    if (distanceFromBottom < 30) {
+      autoScrollRef.current = true;
+    }
   };
 
-  // Auto-scroll: only when user hasn't scrolled up. Use instant scroll
-  // during streaming to avoid smooth-scroll animations fighting user input.
+  // Auto-scroll on new content, but only if user hasn't scrolled up
   useEffect(() => {
-    if (userScrolledUpRef.current) return;
+    if (!autoScrollRef.current) return;
     const el = messagesContainerRef.current;
     if (el) {
+      programmaticScrollRef.current = true;
       el.scrollTop = el.scrollHeight;
     }
   }, [messages]);
