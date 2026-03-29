@@ -28,15 +28,14 @@ export interface UseSessionHistoryReturn {
   readonly lastSnapshot: SessionSnapshot | null
 }
 
-let snapshotCounter = 0;
-
 export function useSessionHistory(): UseSessionHistoryReturn {
   const [snapshots, setSnapshots] = useState<ReadonlyArray<SessionSnapshot>>([]);
   const snapshotsRef = useRef(snapshots);
+  const snapshotCounterRef = useRef(0);
   snapshotsRef.current = snapshots;
 
   const snapshot = useCallback((messages: ReadonlyArray<ChatMessage>, label?: string): string => {
-    const id = `snap-${Date.now()}-${++snapshotCounter}`;
+    const id = `snap-${Date.now()}-${++snapshotCounterRef.current}`;
     const snap: SessionSnapshot = {
       id,
       messages: [...messages],

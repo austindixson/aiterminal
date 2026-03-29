@@ -63,6 +63,16 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
   const [input, setInput] = useState('');
   const [isMultiline, setIsMultiline] = useState(false);
   const [showToolDetails, setShowToolDetails] = useState(true);
+
+  // Inject keyframes once (moved from module scope to avoid SSR/test issues)
+  useEffect(() => {
+    if (!document.head.querySelector('style[data-claude-code-chat]')) {
+      const sheet = document.createElement('style');
+      sheet.setAttribute('data-claude-code-chat', 'true');
+      sheet.textContent = '@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }';
+      document.head.appendChild(sheet);
+    }
+  }, []);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -145,17 +155,13 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
     if (e.key === 'Enter' && !e.shiftKey && !isMultiline) {
       e.preventDefault();
       const messageText = input.trim();
-      console.log('[ClaudeCodeChat] Enter pressed, sending:', messageText);
       if (messageText) {
-        setInput('');  // Clear input immediately
+        setInput('');
         if (backend === 'claude-code' && writeToClaudeCode) {
-          console.log('[ClaudeCodeChat] Sending to Claude Code via PTY only (no OpenRouter)');
           clearClaudeCodeStream?.();
           writeToClaudeCode(messageText);
-          // Add to local messages for bubble display (no OpenRouter trigger)
           setLocalMessages(prev => [...prev, { role: 'user', content: messageText }]);
         } else {
-          console.log('[ClaudeCodeChat] Sending to OpenRouter');
           Promise.resolve(onSendMessage(messageText)).catch((err) => {
             console.error('[ClaudeCodeChat] Send error:', err);
           });
@@ -285,14 +291,14 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
                 <span style={styles.aiName}>{activeIntern ? activeIntern.toUpperCase() : 'MEI'}</span>
                 <span style={styles.aiModel}>•</span>
                 <span style={styles.aiModel}>{presetLabel || modelLabel || 'Unknown'}</span>
-                {'tokens' in msg && (msg as any).tokens?.total && (
+                {(msg as { tokens?: { total?: number } }).tokens?.total ? (
                   <>
                     <span style={styles.aiModel}>•</span>
                     <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>
-                      {(msg as any).tokens.total.toLocaleString()}t
+                      {(msg as { tokens?: { total?: number } }).tokens!.total!.toLocaleString()}t
                     </span>
                   </>
-                )}
+                ) : null}
                 <span style={{ flex: 1 }} />
                 {onCopyMessage && (
                   <button
@@ -772,15 +778,4 @@ const mdComponents = {
   strong: ({children}: any) => <strong style={{fontWeight: 600}}>{children}</strong>,
 };
 
-// Inject keyframes for blinking cursor
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-  @keyframes blink {
-    0%, 50% { opacity: 1; }
-    51%, 100% { opacity: 0; }
-  }
-`;
-if (!document.head.querySelector('style[data-claude-code-chat]')) {
-  styleSheet.setAttribute('data-claude-code-chat', 'true');
-  document.head.appendChild(styleSheet);
-}
+// Keyframe injection moved into component useEffect to avoid module-level DOM mutation

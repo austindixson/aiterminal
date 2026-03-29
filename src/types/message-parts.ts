@@ -74,13 +74,17 @@ export function parseMessageIntoParts(content: string): readonly MessagePart[] {
     },
     {
       regex: /❌ (\w+) ([^:]+): (.+)/,
-      handler: (m) => ({
-        type: 'tool',
-        tool: m[1] as ToolCallPart['tool'],
-        path: m[2],
-        status: 'error' as const,
-        error: m[3],
-      }),
+      handler: (m) => {
+        const validTools: readonly string[] = ['read', 'write', 'edit', 'run', 'delete']
+        const tool = validTools.includes(m[1]) ? m[1] as ToolCallPart['tool'] : 'run' as const
+        return {
+          type: 'tool',
+          tool,
+          path: m[2],
+          status: 'error' as const,
+          error: m[3],
+        }
+      },
     },
   ]
 
