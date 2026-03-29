@@ -247,9 +247,14 @@ export class OpenRouterClient implements IAIClient {
       });
 
       for await (const chunk of stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
-        const delta = chunk.choices[0]?.delta?.content;
+        const choice = chunk.choices[0];
+        const delta = choice?.delta?.content;
         if (delta) {
           yield delta;
+        }
+        // Log if stream ended for unexpected reasons
+        if (choice?.finish_reason && choice.finish_reason !== 'stop') {
+          console.warn(`[OpenRouter] Stream ended with finish_reason: ${choice.finish_reason}`);
         }
       }
     } catch (error: unknown) {

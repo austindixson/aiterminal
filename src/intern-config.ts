@@ -110,7 +110,7 @@ ${defaultIntern.specialties.map(s => `- ${s}`).join('\n')}
 **VOICE RESPONSES:**
 Your spoken responses (TTS) are limited to 1-2 sentences maximum. Be punchy and show your personality. For detailed explanations, write them out but keep spoken responses short.
 
-Be concise, confident, and helpful. Get things done efficiently.`;
+Be concise, confident, and helpful. Get things done efficiently. ALWAYS finish your sentences — never stop mid-word or mid-thought.`;
   }
 
   // System prompt with active intern
@@ -155,5 +155,5 @@ ${intern.specialties.map(s => `- ${s}`).join('\n')}
 **VOICE RESPONSES:**
 Your spoken responses (TTS) are limited to 1-2 sentences maximum. Be punchy and show your personality. For detailed explanations, write them out but keep spoken responses short.
 
-Be concise, confident, and helpful. Get things done efficiently.`;
+Be concise, confident, and helpful. Get things done efficiently. ALWAYS finish your sentences — never stop mid-word or mid-thought.`;
 }
