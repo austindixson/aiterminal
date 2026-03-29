@@ -12,6 +12,7 @@ import type { ChatMessage, ChatMode, ChatState, FileAttachment } from '@/types/c
 import type { FileOperation } from '@/types/agent'
 import { parseAgentResponse, applyOperation } from '@/agent/agent-service'
 import { DEFAULT_INTERN_ID } from '@/intern-config'
+import { useSessionHistory } from './useSessionHistory'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -132,6 +133,9 @@ export interface UseChatReturn {
   readonly cycleChatMode: () => void
   readonly stopAgentLoop: () => void
   readonly isAgentLooping: boolean
+  readonly revertToSnapshot: (snapshotId: string) => void
+  readonly canRevert: boolean
+  readonly sessionSnapshots: ReadonlyArray<{ id: string; label?: string; timestamp: number }>
 }
 
 // ---------------------------------------------------------------------------
@@ -249,6 +253,7 @@ export function useChat(): UseChatReturn {
   const [pendingFileOps, setPendingFileOps] = useState<ReadonlyArray<FileOperation>>([])
   const [chatMode, setChatMode] = useState<ChatMode>('normal')
   const pendingSendRef = useRef<((msg: string) => Promise<void>) | null>(null)
+  const sessionHistory = useSessionHistory()
   const agentLoopActiveRef = useRef(false)
   const agentLoopIterationsRef = useRef(0)
   const MAX_AGENT_ITERATIONS = 10
@@ -365,6 +370,10 @@ export function useChat(): UseChatReturn {
 
       // Create user message with current attachments (skip for hidden continuations)
       if (!_hidden) {
+        // Auto-snapshot before user sends (enables revert)
+        if (messages.length > 0) {
+          sessionHistory.snapshot(messages, `Before: ${trimmed.slice(0, 30)}`)
+        }
         const userMsg = createUserMessage(trimmed, attachedFiles)
         setMessages((prev) => [...prev, userMsg].slice(-MAX_MESSAGES))
       }
@@ -822,5 +831,13 @@ export function useChat(): UseChatReturn {
       agentLoopIterationsRef.current = 0
     }, []),
     isAgentLooping: isStreaming && agentLoopActiveRef.current,
+    revertToSnapshot: useCallback((snapshotId: string) => {
+      const restored = sessionHistory.revert(snapshotId)
+      if (restored) {
+        setMessages(restored)
+      }
+    }, [sessionHistory]),
+    canRevert: sessionHistory.canRevert,
+    sessionSnapshots: sessionHistory.snapshots.map(s => ({ id: s.id, label: s.label, timestamp: s.timestamp })),
   }
 }

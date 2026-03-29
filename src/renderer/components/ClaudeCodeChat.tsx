@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { InlineFileOpsApproval } from './InlineFileOpsApproval';
-import { renderToolCalls } from './ToolCallDisplay';
+import { ToolCallDisplay } from './ToolCallDisplay';
+import { parseMessageIntoParts } from '../../types/message-parts';
 import type { FileOperation } from '../../types/agent';
 import type { ChatMode } from '../../types/chat';
 import '../styles/components.css';
@@ -28,6 +29,7 @@ interface ClaudeCodeChatProps {
   onCycleChatMode?: () => void;
   onStopAgentLoop?: () => void;
   isAgentLooping?: boolean;
+  onCopyMessage?: (content: string) => void;
 }
 
 /**
@@ -56,6 +58,7 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
   onCycleChatMode,
   onStopAgentLoop,
   isAgentLooping = false,
+  onCopyMessage,
 }) => {
   const [input, setInput] = useState('');
   const [isMultiline, setIsMultiline] = useState(false);
@@ -290,27 +293,78 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
                     </span>
                   </>
                 )}
+                <span style={{ flex: 1 }} />
+                {onCopyMessage && (
+                  <button
+                    onClick={() => onCopyMessage(msg.content)}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'rgba(255,255,255,0.2)', fontSize: '10px', padding: '0 2px',
+                    }}
+                    title="Copy message"
+                  >
+                    copy
+                  </button>
+                )}
               </div>
             )}
             <div style={styles.messageBubble}>
               <div style={styles.messageContent}>
                 {(() => {
                   if (msg.role === 'assistant') {
-                    const { cleanText, toolCalls } = renderToolCalls(msg.content);
+                    // Parse into typed parts for structured rendering
+                    const parts = parseMessageIntoParts(msg.content);
+                    const hasToolParts = parts.some(p => p.type !== 'text');
+
                     return (
                       <>
-                        {showToolDetails && toolCalls.length > 0 && (
-                          <div style={{ marginBottom: cleanText ? '8px' : 0 }}>
-                            {toolCalls}
-                          </div>
-                        )}
-                        {cleanText && (
-                          <div style={styles.markdownWrapper}>
-                            <ReactMarkdown components={mdComponents}>
-                              {cleanText}
-                            </ReactMarkdown>
-                          </div>
-                        )}
+                        {parts.map((part, pi) => {
+                          if (part.type === 'text') {
+                            return (
+                              <div key={pi} style={styles.markdownWrapper}>
+                                <ReactMarkdown components={mdComponents}>
+                                  {part.content}
+                                </ReactMarkdown>
+                              </div>
+                            );
+                          }
+                          if (!showToolDetails && hasToolParts) return null;
+                          if (part.type === 'tool') {
+                            return (
+                              <ToolCallDisplay
+                                key={pi}
+                                type={part.tool}
+                                path={part.path}
+                                summary={part.command || part.summary}
+                                status={part.status}
+                                errorMsg={part.error}
+                              />
+                            );
+                          }
+                          if (part.type === 'file') {
+                            return (
+                              <ToolCallDisplay
+                                key={pi}
+                                type="read"
+                                path={part.path}
+                                summary={`${part.lines} lines, ${Math.round(part.size / 1024)}KB`}
+                                status="done"
+                              />
+                            );
+                          }
+                          if (part.type === 'diff') {
+                            return (
+                              <ToolCallDisplay
+                                key={pi}
+                                type="edit"
+                                path={part.path}
+                                status="done"
+                                diff={{ removed: [...part.removed], added: [...part.added] }}
+                              />
+                            );
+                          }
+                          return null;
+                        })}
                       </>
                     );
                   }
