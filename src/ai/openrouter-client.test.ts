@@ -109,11 +109,11 @@ describe('OpenRouterClient — getActiveModel', () => {
     expect(model.id).toBe('google/gemini-2.5-pro-preview-03-25');
   });
 
-  it('"budget" preset + "error_analysis" returns DeepSeek V3', () => {
+  it('"budget" preset + "error_analysis" returns Nemotron Super', () => {
     const client = new OpenRouterClient(makeConfig({ activePreset: 'budget' }));
     const model = client.getActiveModel('error_analysis');
-    expect(model.name).toBe('DeepSeek V3');
-    expect(model.id).toBe('deepseek/deepseek-chat');
+    expect(model.name).toBe('Nemotron Super 120B');
+    expect(model.id).toBe('nvidia/nemotron-3-super-120b-a12b:free');
   });
 });
 
@@ -145,8 +145,8 @@ describe('OpenRouterClient — setPreset', () => {
     expect(client.getActiveModel('command_help').name).toBe('GPT-4o Mini');
 
     client.setPreset('budget');
-    // budget → command_help = Gemini 2.0 Flash
-    expect(client.getActiveModel('command_help').name).toBe('Gemini 2.0 Flash');
+    // budget → command_help = Nemotron Nano
+    expect(client.getActiveModel('command_help').name).toBe('Nemotron Nano 30B');
   });
 });
 
@@ -272,7 +272,7 @@ describe('resolveModelForTask', () => {
 
   it('error_analysis maps to errorAnalyzer field', () => {
     const modelId = resolveModelForTask('error_analysis', 'budget');
-    expect(modelId).toBe('deepseek/deepseek-chat');
+    expect(modelId).toBe('nvidia/nemotron-3-super-120b-a12b:free');
   });
 
   it('falls back to generalAssistant for unknown task types', () => {
