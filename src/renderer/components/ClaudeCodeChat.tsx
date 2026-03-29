@@ -75,7 +75,7 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     // User scrolled up — stop auto-scrolling
-    if (distanceFromBottom > 150) {
+    if (distanceFromBottom > 25) {
       autoScrollRef.current = false;
     }
     // User scrolled back to bottom — resume auto-scrolling
