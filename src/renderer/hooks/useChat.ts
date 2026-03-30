@@ -934,7 +934,7 @@ export function useChat(): UseChatReturn {
                 if (doomMap[sig] >= 3) doomDetected = true
               }
               if (doomDetected) {
-                console.warn(`[AgentLoop] DOOM LOOP detected — same tool calls repeated ${doomMap[callSig]} times, stopping`)
+                console.warn(`[AgentLoop] DOOM LOOP detected — same tool call repeated 3+ times, stopping`)
                 setAgentLoopActive(false)
                 ;(window as any).__nativeToolSession = false
                 ;(window as any).__doomLoopMap = {}
@@ -995,6 +995,9 @@ export function useChat(): UseChatReturn {
                   } else if (name === 'run_command' && args.command) {
                     const sessionId = getAgentLoopState().activeSessionId
                     if (sessionId && window.electronAPI?.writeToSession) {
+                      // Send Ctrl+C first to kill any running process, then brief pause
+                      window.electronAPI.writeToSession(sessionId, '\x03')
+                      await new Promise(r => setTimeout(r, 300))
                       window.electronAPI.writeToSession(sessionId, args.command + '\r')
                       const output = await capturePtyOutput(sessionId, args.command, 15000)
                       const important = extractImportantOutput(output, args.command)
