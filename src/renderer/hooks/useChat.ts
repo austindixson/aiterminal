@@ -970,12 +970,40 @@ export function useChat(): UseChatReturn {
                 return cwd ? `${cwd}/${p}` : p
               }
 
-              // Execute all tool calls sequentially, collect results
-              // displayParts: compact one-liners for the chat UI
-              // modelParts: full context for the model continuation
+              // Execute tool calls: commands run in parallel via ephemeral PTYs,
+              // file operations run sequentially
               const displayParts: string[] = []
               const modelParts: string[] = []
-              for (const tc of nativeToolCalls) {
+
+              // 1. Run all commands in parallel via ephemeral PTY sessions
+              const commandCalls = nativeToolCalls.filter(tc => tc.name === 'run_command' && tc.arguments.command)
+              if (commandCalls.length > 0 && window.electronAPI?.agentExec) {
+                const results = await Promise.all(
+                  commandCalls.map(tc =>
+                    window.electronAPI.agentExec({
+                      command: tc.arguments.command,
+                      cwd,
+                      timeoutMs: 30_000,
+                    }).catch(e => ({
+                      output: `Error: ${e instanceof Error ? e.message : 'unknown'}`,
+                      exitCode: -1,
+                      executionId: '',
+                    }))
+                  )
+                )
+                for (let i = 0; i < commandCalls.length; i++) {
+                  const cmd = commandCalls[i].arguments.command
+                  const { output, exitCode } = results[i]
+                  const important = extractImportantOutput(output, cmd)
+                  const status = exitCode === 0 ? '✓' : `✗ exit ${exitCode}`
+                  displayParts.push(`⚡ \`${cmd}\` ${status}`)
+                  modelParts.push(`Output from \`${cmd}\` (exit ${exitCode}):\n\`\`\`\n${important || '(no output)'}\n\`\`\``)
+                }
+              }
+
+              // 2. Execute file operations sequentially
+              const fileCalls = nativeToolCalls.filter(tc => tc.name !== 'run_command')
+              for (const tc of fileCalls) {
                 const { name, arguments: args } = tc
                 try {
                   if (name === 'read_file' && args.path) {
@@ -991,18 +1019,6 @@ export function useChat(): UseChatReturn {
                       const msg = `Failed to read \`${args.path}\`: ${result.error || 'empty'}`
                       displayParts.push(msg)
                       modelParts.push(msg)
-                    }
-                  } else if (name === 'run_command' && args.command) {
-                    const sessionId = getAgentLoopState().activeSessionId
-                    if (sessionId && window.electronAPI?.writeToSession) {
-                      // Send Ctrl+C first to kill any running process, then brief pause
-                      window.electronAPI.writeToSession(sessionId, '\x03')
-                      await new Promise(r => setTimeout(r, 300))
-                      window.electronAPI.writeToSession(sessionId, args.command + '\r')
-                      const output = await capturePtyOutput(sessionId, args.command, 15000)
-                      const important = extractImportantOutput(output, args.command)
-                      displayParts.push(`⚡ Executed: \`${args.command}\``)
-                      modelParts.push(`Output from \`${args.command}\`:\n\`\`\`\n${important || '(no output)'}\n\`\`\``)
                     }
                   } else if (name === 'edit_file' && args.path && args.search !== undefined && args.replace !== undefined) {
                     const fullPath = resolvePath(args.path)
@@ -1421,11 +1437,15 @@ export function useChat(): UseChatReturn {
       agentLoopIterationsRef.current = 0
       continuationPendingRef.current = false
       ;(window as any).__nativeToolSession = false
-      // Cancel the active streaming request if any
+      ;(window as any).__doomLoopMap = {}
+      // Cancel the active streaming request
       if (activeStreamIdRef.current) {
         window.electronAPI?.cancelAIStream?.(activeStreamIdRef.current)
         activeStreamIdRef.current = null
       }
+      // Kill all running agent processes (ephemeral PTY sessions)
+      window.electronAPI?.killAgentProcesses?.().catch(() => {})
+      setIsStreaming(false)
     }, []),
     isAgentLooping: isLooping,
     revertToSnapshot: useCallback((snapshotId: string) => {

@@ -135,6 +135,17 @@ export interface ElectronAPI {
   ) => Promise<void>;
   cancelAIStream: (requestId: string) => void;
 
+  /** Execute a command in an ephemeral PTY session (agent tool calls) */
+  agentExec: (params: {
+    command: string;
+    cwd: string;
+    timeoutMs?: number;
+    executionId?: string;
+  }) => Promise<{ output: string; exitCode: number; executionId: string }>;
+
+  /** Kill all running agent processes */
+  killAgentProcesses: () => Promise<{ killed: number }>;
+
   /** Gateway daemon (optional TCP client to ~/.aiterminal gateway) */
   onDaemonEvent: (callback: (payload: unknown) => void) => () => void;
   daemonSubmitGoal: (goal: string) => Promise<{ success: boolean }>;

@@ -116,6 +116,12 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.send('ai-query-stream-cancel', requestId);
   },
 
+  agentExec: (params: { command: string; cwd: string; timeoutMs?: number; executionId?: string }) =>
+    ipcRenderer.invoke('execute-command', params),
+
+  killAgentProcesses: () =>
+    ipcRenderer.invoke('kill-agent-processes'),
+
   onDaemonEvent: (callback) => {
     const handler = (_event: unknown, payload: unknown) => callback(payload);
     ipcRenderer.on('daemon-event', handler);

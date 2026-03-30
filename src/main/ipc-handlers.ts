@@ -434,6 +434,113 @@ export function setupAllHandlers(
     cancelledStreamIds.add(requestId);
   });
 
+  // ---------------------------------------------------------------------------
+  // Ephemeral command execution (agent tool calls)
+  // Spawns an isolated PTY, runs the command, captures output, destroys PTY.
+  // Supports parallel execution — each call gets its own PTY.
+  // ---------------------------------------------------------------------------
+
+  const agentProcesses = new Map<string, { pty: IPtyProcess; kill: () => void }>();
+
+  ipc.handle('execute-command', async (_event, params: {
+    command: string;
+    cwd: string;
+    timeoutMs?: number;
+    executionId?: string;
+  }) => {
+    const { command, cwd, timeoutMs = 30_000, executionId } = params;
+    const execId = executionId || `exec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const isWin = process.platform === 'win32';
+    const shell = isWin ? (process.env.COMSPEC || 'cmd.exe') : (process.env.SHELL || '/bin/bash');
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '/';
+
+    return new Promise<{ output: string; exitCode: number; executionId: string }>((resolve) => {
+      try {
+        const nodePty = require('node-pty') as typeof import('node-pty');
+        const ptyProcess = nodePty.spawn(shell, isWin ? [] : ['-c', command], {
+          name: 'xterm-256color',
+          cols: 120,
+          rows: 30,
+          cwd: cwd || homeDir,
+          env: {
+            ...process.env,
+            TERM: 'xterm-256color',
+          } as Record<string, string>,
+        });
+
+        // Track for abort support
+        agentProcesses.set(execId, {
+          pty: ptyProcess,
+          kill: () => { try { ptyProcess.kill(); } catch {} },
+        });
+
+        let output = '';
+        let settled = false;
+
+        const cleanup = () => {
+          if (settled) return;
+          settled = true;
+          agentProcesses.delete(execId);
+          try { ptyProcess.kill(); } catch {}
+        };
+
+        // For non-Windows, command is passed via -c flag, so PTY runs it directly
+        // For Windows, write the command to the shell
+        if (isWin) {
+          ptyProcess.write(`${command}\r`);
+        }
+
+        ptyProcess.onData((data: string) => {
+          output += data;
+        });
+
+        ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
+          cleanup();
+          // Strip ANSI escape codes
+          const clean = output
+            .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+            .replace(/\x1b\][^\x07]*\x07/g, '')
+            .replace(/\x1b\]8;;[^\x1b]*\x1b\\/g, '')
+            .replace(/\r/g, '');
+          resolve({ output: clean, exitCode, executionId: execId });
+        });
+
+        // Timeout guard
+        setTimeout(() => {
+          if (!settled) {
+            cleanup();
+            const clean = output
+              .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+              .replace(/\r/g, '');
+            resolve({
+              output: clean + `\n[Command timed out after ${timeoutMs}ms]`,
+              exitCode: -1,
+              executionId: execId,
+            });
+          }
+        }, timeoutMs);
+      } catch (error) {
+        resolve({
+          output: `Error: ${error instanceof Error ? error.message : 'Failed to spawn process'}`,
+          exitCode: -1,
+          executionId: execId,
+        });
+      }
+    });
+  });
+
+  // Kill all agent processes (called by stop button)
+  ipc.handle('kill-agent-processes', () => {
+    const count = agentProcesses.size;
+    for (const [id, proc] of agentProcesses) {
+      console.log(`[Agent] Killing process ${id}`);
+      proc.kill();
+    }
+    agentProcesses.clear();
+    return { killed: count };
+  });
+
   // Theme management
   ipc.handle('get-themes', () => {
     return themeHandlers.getThemes();
