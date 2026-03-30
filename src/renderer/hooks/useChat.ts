@@ -586,7 +586,7 @@ export function useChat(): UseChatReturn {
         if (!_hidden) {
           agentLoopIterationsRef.current = 0
           ;(window as any).__nativeToolSession = false
-          ;(window as any).__doomLoopMap = {}
+          ;(window as any).__doomLoopState = { lastSig: '', count: 0 }
         }
       }
 
@@ -925,22 +925,23 @@ export function useChat(): UseChatReturn {
             // NATIVE TOOL CALL EXECUTION (batched, sequential, single continuation)
             // ---------------------------------------------------------------
             if (hadNativeToolCalls && chatMode === 'autocode' && agentLoopActiveRef.current) {
-              // Doom loop detection: if any individual tool call repeats 3+ times, stop
-              const doomMap: Record<string, number> = (window as any).__doomLoopMap ??= {}
-              let doomDetected = false
-              for (const tc of nativeToolCalls) {
-                const sig = `${tc.name}:${JSON.stringify(tc.arguments)}`
-                doomMap[sig] = (doomMap[sig] || 0) + 1
-                if (doomMap[sig] >= 3) doomDetected = true
+              // Doom loop detection: if the EXACT same batch of tool calls repeats
+              // 3 consecutive times, stop. Different batches reset the counter.
+              const batchSig = nativeToolCalls.map(tc => `${tc.name}:${JSON.stringify(tc.arguments)}`).sort().join('|')
+              const doomState: { lastSig: string; count: number } = (window as any).__doomLoopState ??= { lastSig: '', count: 0 }
+              if (batchSig === doomState.lastSig) {
+                doomState.count++
+              } else {
+                doomState.lastSig = batchSig
+                doomState.count = 1
               }
-              if (doomDetected) {
-                console.warn(`[AgentLoop] DOOM LOOP detected — same tool call repeated 3+ times, stopping`)
+              if (doomState.count >= 3) {
+                console.warn(`[AgentLoop] DOOM LOOP detected — same batch repeated ${doomState.count} consecutive times, stopping`)
                 setAgentLoopActive(false)
                 ;(window as any).__nativeToolSession = false
-                ;(window as any).__doomLoopMap = {}
+                ;(window as any).__doomLoopState = { lastSig: '', count: 0 }
                 const doomMsg = createAssistantMessage('Loop stopped — repeated the same action 3 times without progress.')
                 setMessages((prev) => [...prev, doomMsg].slice(-MAX_MESSAGES))
-                // fall through to display the accumulated text
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === placeholderId ? { ...m, content: afterRunTags } : m,
@@ -1437,7 +1438,7 @@ export function useChat(): UseChatReturn {
       agentLoopIterationsRef.current = 0
       continuationPendingRef.current = false
       ;(window as any).__nativeToolSession = false
-      ;(window as any).__doomLoopMap = {}
+      ;(window as any).__doomLoopState = { lastSig: '', count: 0 }
       // Cancel the active streaming request
       if (activeStreamIdRef.current) {
         window.electronAPI?.cancelAIStream?.(activeStreamIdRef.current)

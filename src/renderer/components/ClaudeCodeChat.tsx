@@ -467,18 +467,6 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
             </div>
           </div>
         )}
-        {/* Thinking indicator with shimmer + timer */}
-        {isStreaming && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '8px 0', fontSize: '12px',
-          }}>
-            <TextShimmer text="Thinking..." active={true} />
-            <span style={{ fontFamily: 'monospace', fontSize: '10px', opacity: 0.3 }}>
-              {elapsedSec}s
-            </span>
-          </div>
-        )}
         {/* File operation approval widget */}
         {pendingFileOps.length > 0 && onApproveFileOps && onRejectFileOps && (
           <InlineFileOpsApproval
@@ -488,6 +476,27 @@ export const ClaudeCodeChat: React.FC<ClaudeCodeChatProps> = ({
           />
         )}
         <div ref={messagesEndRef} />
+      </div>
+
+      {/* Status line — fixed height, never causes layout shift */}
+      <div style={{
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        height: '28px',
+        padding: '0 14px',
+        borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+        fontSize: '12px',
+      }}>
+        {isStreaming && (
+          <>
+            <TextShimmer text="Thinking..." active={true} />
+            <span style={{ fontFamily: 'monospace', fontSize: '10px', opacity: 0.3 }}>
+              {elapsedSec}s
+            </span>
+          </>
+        )}
       </div>
 
       {/* Input Area — OpenCode / Cursor style */}
