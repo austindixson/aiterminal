@@ -80,7 +80,11 @@ export class KokoroTtsService {
     }
     if (this.child) {
       try {
-        this.child.kill('SIGTERM');
+        if (process.platform === 'win32') {
+          this.child.kill();
+        } else {
+          this.child.kill('SIGTERM');
+        }
       } catch {
         /* noop */
       }

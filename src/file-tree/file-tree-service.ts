@@ -194,7 +194,7 @@ export async function readDirectoryTree(
           name: dirent.name,
           path: fullPath,
           isDirectory: isDir,
-          isHidden: dirent.name.startsWith('.'),
+          isHidden: dirent.name.startsWith('.') || WIN_HIDDEN_NAMES.has(dirent.name.toLowerCase()),
           size,
           extension: getExtension(dirent.name, isDir),
           ...(children !== undefined ? { children } : {}),

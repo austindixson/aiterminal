@@ -75,7 +75,7 @@ export function useTroubleshoot(
     () =>
       contextCollector.getSessionContext(
         process.env.PWD ?? process.cwd?.() ?? '/',
-        process.env.SHELL ?? '/bin/zsh',
+        process.env.SHELL ?? (process.platform === 'win32' ? (process.env.COMSPEC || 'cmd.exe') : '/bin/zsh'),
       ),
     [contextCollector],
   )

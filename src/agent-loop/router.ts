@@ -278,7 +278,8 @@ export class AgentLoopRouter extends EventEmitter {
     intern: 'mei' | 'sora' | 'hana',
     workspaceRoot: string
   ): string {
-    return `${workspaceRoot}/${intern}`;
+    const sep = workspaceRoot.includes('\\') ? '\\' : '/';
+    return `${workspaceRoot}${sep}${intern}`;
   }
 }
 

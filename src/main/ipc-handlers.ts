@@ -453,7 +453,7 @@ export function setupAllHandlers(
 
     const isWin = process.platform === 'win32';
     const shell = isWin ? (process.env.COMSPEC || 'cmd.exe') : (process.env.SHELL || '/bin/bash');
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '/';
+    const homeDir = process.env.HOME || process.env.USERPROFILE || (isWin ? 'C:\\' : '/');
 
     return new Promise<{ output: string; exitCode: number; executionId: string }>((resolve) => {
       try {

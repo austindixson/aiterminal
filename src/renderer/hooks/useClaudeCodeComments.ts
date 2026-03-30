@@ -17,7 +17,7 @@ import type { ClaudeCodeMessage } from '../../types';
  * Falls back to a simple template if the AI call fails.
  */
 async function generateAIGreeting(cwd: string): Promise<string> {
-  const folderName = cwd.split('/').filter(Boolean).pop() || 'project';
+  const folderName = cwd.split(/[/\\]/).filter(Boolean).pop() || 'project';
 
   // Try AI-generated greeting via OpenRouter
   try {
@@ -329,7 +329,7 @@ function generateContextualComment(
 
     if (tool && tool.input && typeof tool.input === 'object') {
       const filePath = String(tool.input['file_path'] || '');
-      const fileName = filePath.split('/').pop() || filePath;
+      const fileName = filePath.split(/[/\\]/).pop() || filePath;
 
       // Only comment if it's a significant file and we haven't recently
       if (fileName.endsWith('.tsx') || fileName.endsWith('.ts') ||

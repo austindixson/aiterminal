@@ -62,7 +62,7 @@ export function useFilePreview(): UseFilePreviewReturn {
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map())
 
   const openFile = useCallback(async (filePath: string): Promise<void> => {
-    const fileName = filePath.split('/').pop() ?? filePath
+    const fileName = filePath.split(/[/\\]/).pop() ?? filePath
     const language = detectLanguage(fileName)
 
     // Check cache first

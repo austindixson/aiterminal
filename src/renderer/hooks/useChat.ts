@@ -1051,8 +1051,12 @@ export function useChat(): UseChatReturn {
               }
               const resolvePath = (p: string): string => {
                 if (!p) return p
-                if (p.startsWith('/')) return p
-                return cwd ? `${cwd}/${p}` : p
+                // Check for both Unix and Windows absolute paths
+                if (p.startsWith('/') || /^[A-Za-z]:[/\\]/.test(p)) return p
+                if (!cwd) return p
+                // Use the separator that matches the cwd
+                const s = cwd.includes('\\') ? '\\' : '/'
+                return `${cwd.replace(/[/\\]$/, '')}${s}${p}`
               }
 
               // Execute tool calls: commands run in parallel via ephemeral PTYs,

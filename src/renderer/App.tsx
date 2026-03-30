@@ -707,7 +707,13 @@ export const App: FC = () => {
     const unsubscribe = window.electronAPI.onAnySessionData?.((sessionId, data) => {
       // Detect cd commands in terminal output
       // Look for command patterns like "cd path", "cd ~/path", "cd ..", "cd /path"
-      const lines = data.split('\n')
+      // Strip ANSI escape codes first so prompt formatting doesn't interfere
+      const clean = data
+        .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+        .replace(/\x1b\][^\x07]*\x07/g, '')
+        .replace(/\x1b\]8;;[^\x1b]*\x1b\\/g, '')
+        .replace(/\r/g, '')
+      const lines = clean.split('\n')
       for (const line of lines) {
         const trimmed = line.trim()
 
@@ -716,9 +722,9 @@ export const App: FC = () => {
           continue
         }
 
-        // Match cd command at the start of a line (shell prompt)
-        // Common patterns: "cd path", "cd ~/path", "cd ..", "cd ../", "cd /abs/path"
-        const cdMatch = trimmed.match(/^(cd\s+)([^\s;&|]+)/)
+        // Match cd command anywhere in the line (after prompt chars like $, %, >, #)
+        // Handles: "$ cd src", "user@host:~$ cd path", "PS C:\> cd path", "cd path"
+        const cdMatch = trimmed.match(/(?:^|[$%>#]\s*)(cd\s+)([^\s;&|]+)/)
 
         if (cdMatch) {
           const cdCommand = trimmed

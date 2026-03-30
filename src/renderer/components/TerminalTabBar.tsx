@@ -19,9 +19,11 @@ import type { Tab } from '@/types/terminal-tabs'
 
 function shortenPath(path: string, maxLength = 30): string {
   if (path.length <= maxLength) return path
-  const parts = path.split('/')
+  // Handle both Unix (/) and Windows (\) separators
+  const parts = path.split(/[/\\]/).filter(Boolean)
   if (parts.length <= 2) return path
-  return `.../${parts.slice(-2).join('/')}`
+  const s = path.includes('\\') ? '\\' : '/'
+  return `...${s}${parts.slice(-2).join(s)}`
 }
 
 function getInternColor(intern?: string): string {

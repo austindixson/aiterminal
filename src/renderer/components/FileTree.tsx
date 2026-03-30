@@ -13,13 +13,22 @@ import type { FC } from 'react'
 import type { FileEntry } from '@/types/file-tree'
 import { getFileIcon } from '@/file-tree/file-tree-service'
 
-/** POSIX parent directory — browser-safe (no Node `path`; Vite cannot bundle it for the renderer). */
-function posixDirname(p: string): string {
-  if (!p || p === '/') return '/'
-  const trimmed = p.replace(/\/+$/, '')
-  if (trimmed === '/') return '/'
-  const i = trimmed.lastIndexOf('/')
-  if (i <= 0) return '/'
+/** Parent directory — browser-safe (no Node `path`). Handles both Unix `/` and Windows `\`. */
+function dirname(p: string): string {
+  if (!p) return '/'
+  // Detect Windows drive root (e.g. C:\)
+  const winRoot = p.match(/^[A-Za-z]:[/\\]/)
+  if (winRoot && p.length <= 3) return p
+  if (p === '/') return '/'
+  const trimmed = p.replace(/[/\\]+$/, '')
+  if (!trimmed || trimmed === '/') return '/'
+  // Find last separator (either / or \)
+  const slashIdx = trimmed.lastIndexOf('/')
+  const backslashIdx = trimmed.lastIndexOf('\\')
+  const i = Math.max(slashIdx, backslashIdx)
+  if (i <= 0) return winRoot ? winRoot[0] : '/'
+  // Preserve Windows drive root
+  if (winRoot && i <= 2) return winRoot[0]
   return trimmed.slice(0, i) || '/'
 }
 
@@ -184,7 +193,7 @@ export const FileTree: FC<FileTreeProps> = ({
     [entries, showHidden],
   )
 
-  const derivedCanGoParent = cwd.length > 0 && posixDirname(cwd) !== cwd
+  const derivedCanGoParent = cwd.length > 0 && dirname(cwd) !== cwd
   const showParent =
     typeof onGoToParent === 'function' &&
     (canGoToParent !== undefined ? canGoToParent : derivedCanGoParent)

@@ -12,7 +12,7 @@ import type { FileEntry } from '@/types/file-tree'
 // Constants
 // ---------------------------------------------------------------------------
 
-const MENTION_REGEX = /@([\w.\-/]+)/g
+const MENTION_REGEX = /@([\w.\-/\\]+)/g
 const DEFAULT_MAX_CHARS = 8000
 const MAX_SEARCH_RESULTS = 10
 
@@ -63,8 +63,10 @@ function detectLanguage(filePath: string): string {
 }
 
 function getFileName(filePath: string): string {
-  const slashIndex = filePath.lastIndexOf('/')
-  return slashIndex === -1 ? filePath : filePath.slice(slashIndex + 1)
+  const slashIdx = filePath.lastIndexOf('/')
+  const backslashIdx = filePath.lastIndexOf('\\')
+  const lastSep = Math.max(slashIdx, backslashIdx)
+  return lastSep === -1 ? filePath : filePath.slice(lastSep + 1)
 }
 
 // ---------------------------------------------------------------------------

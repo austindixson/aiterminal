@@ -195,21 +195,24 @@ class ClaudeCodeServiceImpl implements ClaudeCodeService {
     }
 
     try {
-      // Try SIGTERM first for graceful shutdown
-      this.child.kill('SIGTERM');
+      if (process.platform === 'win32') {
+        // Windows: kill() maps to TerminateProcess (immediate)
+        this.child.kill();
+      } else {
+        // Unix: try graceful SIGTERM, then force SIGKILL after timeout
+        this.child.kill('SIGTERM');
 
-      // Force kill after 5 seconds if still running
-      const timeout = setTimeout(() => {
-        if (this.child) {
-          this.child.kill('SIGKILL');
-        }
-      }, 5000);
+        const timeout = setTimeout(() => {
+          if (this.child) {
+            try { this.child.kill('SIGKILL'); } catch { /* already dead */ }
+          }
+        }, 5000);
 
-      // Clear timeout if process exits gracefully
-      this.child.once('exit', () => {
-        clearTimeout(timeout);
-      });
-    } catch (error) {
+        this.child.once('exit', () => {
+          clearTimeout(timeout);
+        });
+      }
+    } catch {
       // Ignore errors during kill (process may already be dead)
     }
 

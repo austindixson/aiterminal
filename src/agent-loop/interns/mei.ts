@@ -13,6 +13,7 @@ import type { AgentEvent } from '../events.js';
 import type { InternResult, InternSessionConfig } from '../intern-session.js';
 import { BaseInternSession, createInternSession } from '../intern-session.js';
 import { getDietmcpBin } from '../../integrations/ecosystem.js';
+import { IS_WIN, escapeShellArg, buildCdAndRun } from '../../utils/platform.js';
 
 // Reserved for future multi-agent support
 // interface CodingAgent {
@@ -117,7 +118,8 @@ Always explain what you're doing briefly, then provide the file operations.`;
       timeout: this.config.timeout
     });
 
-    this.childProcess = spawn(dietmcpBin, ['exec', 'bash', '--args', args], {
+    const shellTool = IS_WIN ? 'powershell' : 'bash';
+    this.childProcess = spawn(dietmcpBin, ['exec', shellTool, '--args', args], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env
     });
@@ -198,20 +200,17 @@ Always explain what you're doing briefly, then provide the file operations.`;
    * Build command for the coding agent.
    */
   private buildCommand(agent: string, task: string): string {
-    const escapedTask = task.replace(/'/g, "'\\''");
+    const escaped = escapeShellArg(task);
 
     switch (agent) {
       case 'claude':
-        // Claude Code: --print --permission-mode bypassPermissions
-        return `cd "${this.config.workspace}" && claude --permission-mode bypassPermissions --print '${escapedTask}'`;
+        return buildCdAndRun(this.config.workspace, `claude --permission-mode bypassPermissions --print ${escaped}`);
 
       case 'codex':
-        // Codex: needs PTY, exec mode
-        return `cd "${this.config.workspace}" && codex exec --full-auto '${escapedTask}'`;
+        return buildCdAndRun(this.config.workspace, `codex exec --full-auto ${escaped}`);
 
       case 'pi':
-        // Pi coding agent
-        return `cd "${this.config.workspace}" && pi -p '${escapedTask}'`;
+        return buildCdAndRun(this.config.workspace, `pi -p ${escaped}`);
 
       default:
         throw new Error(`Unknown coding agent: ${agent}`);

@@ -84,17 +84,27 @@ export class TerminalSessionManager {
       ? (process.env.COMSPEC || 'cmd.exe')
       : (process.env.SHELL || '/bin/bash');
 
-    const ALLOWED_SHELLS = new Set([
-      '/bin/bash', '/bin/zsh', '/bin/sh', '/usr/bin/bash', '/usr/bin/zsh',
-      '/usr/local/bin/bash', '/usr/local/bin/zsh', '/usr/local/bin/fish',
-      'cmd.exe', 'powershell.exe', 'pwsh.exe',
-      process.env.COMSPEC, process.env.SHELL,
-    ].filter(Boolean));
+    const ALLOWED_SHELLS = isWin
+      ? new Set([
+          'cmd.exe', 'powershell.exe', 'pwsh.exe',
+          process.env.COMSPEC,
+        ].filter(Boolean))
+      : new Set([
+          '/bin/bash', '/bin/zsh', '/bin/sh', '/usr/bin/bash', '/usr/bin/zsh',
+          '/usr/local/bin/bash', '/usr/local/bin/zsh', '/usr/local/bin/fish',
+          process.env.SHELL,
+        ].filter(Boolean));
 
     const requestedShell = options.shell;
-    const shell = (requestedShell && ALLOWED_SHELLS.has(requestedShell))
-      ? requestedShell
-      : defaultShell;
+    // On Windows, match case-insensitively and also check basename
+    const isAllowed = requestedShell
+      ? isWin
+        ? Array.from(ALLOWED_SHELLS).some(s =>
+            s!.toLowerCase() === requestedShell.toLowerCase() ||
+            s!.toLowerCase().endsWith('\\' + requestedShell.toLowerCase()))
+        : ALLOWED_SHELLS.has(requestedShell)
+      : false;
+    const shell = isAllowed ? requestedShell! : defaultShell;
     const homeDir = process.env.HOME || process.env.USERPROFILE || (isWin ? 'C:\\' : '/');
     const cwd = options.cwd || homeDir;
     const cols = options.cols || 80;

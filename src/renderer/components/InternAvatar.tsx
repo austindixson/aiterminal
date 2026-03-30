@@ -1220,7 +1220,7 @@ export function InternAvatar({
   // Helper to shorten path for display
   const shortenPath = (path: string | undefined): string | undefined => {
     if (!path) return undefined;
-    const parts = path.split('/');
+    const parts = path.split(/[/\\]/);
     const lastPart = parts[parts.length - 1];
     return lastPart || path;
   };

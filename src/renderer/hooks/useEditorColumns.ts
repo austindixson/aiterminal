@@ -70,7 +70,11 @@ function generateTabId(): string {
 }
 
 function getFileName(path: string): string {
-  return path.split('/').pop() || path
+  // Handle both Unix (/) and Windows (\) separators
+  const slashIdx = path.lastIndexOf('/')
+  const backslashIdx = path.lastIndexOf('\\')
+  const lastSep = Math.max(slashIdx, backslashIdx)
+  return lastSep === -1 ? path : path.slice(lastSep + 1)
 }
 
 function getLanguageId(path: string): string | undefined {
