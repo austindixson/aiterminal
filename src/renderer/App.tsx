@@ -211,11 +211,29 @@ export const App: FC = () => {
   }, [backendSelector.activeBackend, tuiMode])
 
   // Sora companion — terminal-aware conversational AI
+  const voiceActiveRef = useRef(false)
+  voiceActiveRef.current = voiceActive
   const soraCompanion = useSoraCompanion({
     getActiveSessionId: () => terminalTabs.getActiveSessionId(),
     onSpeak: (text) => { voice.speak(text).catch(() => {}) },
     onBubble: (text) => { speechBubbles.addBubble(text) },
+    onContextSnapshot: (ctx) => {
+      // Only push to ElevenLabs agent when voice call is active
+      if (voiceActiveRef.current) elevenAgent.sendContext(ctx)
+    },
   })
+
+  // Silence keepalive — tell ElevenLabs agent the user is coding, not gone.
+  // Fires every 45s during voice call to prevent "are you still there?" prompts.
+  useEffect(() => {
+    if (!voiceActive) return
+    const interval = setInterval(() => {
+      elevenAgent.sendContext(
+        'The user is actively coding in silence. Do NOT ask if they are there. Stay quiet until they speak or something notable happens in the terminal.'
+      )
+    }, 45_000)
+    return () => clearInterval(interval)
+  }, [voiceActive, elevenAgent])
 
   // Active terminal session cwd (file tree + picker); derived from active tab
   const activeTabCwd = useMemo(() => {

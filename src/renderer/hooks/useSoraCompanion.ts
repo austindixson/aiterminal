@@ -25,6 +25,8 @@ export interface UseSoraCompanionOptions {
   readonly getActiveSessionId: () => string | null
   readonly onSpeak?: (text: string) => void
   readonly onBubble?: (text: string) => void
+  /** Called at strategic moments with a compact context snapshot (for voice agent). */
+  readonly onContextSnapshot?: (context: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -36,6 +38,19 @@ const MAX_MESSAGES = 30
 const AUTO_STATUS_COOLDOWN_MS = 60_000
 const IDLE_THRESHOLD_MS = 5_000
 const ACTIVITY_CHAR_THRESHOLD = 500
+const CONTEXT_SNAPSHOT_COOLDOWN_MS = 15_000
+
+// High-signal patterns worth pushing context for
+const ERROR_PATTERNS = [
+  /\berror\b/i, /\bfailed\b/i, /\bfailure\b/i, /\bpanic\b/i,
+  /command not found/i, /permission denied/i, /not recognized/i,
+  /FAIL/,
+]
+const COMPLETION_PATTERNS = [
+  /\bpassed\b/i, /\bcomplete[d]?\b/i, /\bsuccess\b/i, /\bdone\b/i,
+  /\bfinished\b/i, /tests? (?:passed|ok)\b/i, /build succeeded/i,
+  /✓/, /✅/,
+]
 
 const SORA_SYSTEM_PROMPT = `You are Sora, a friendly AI companion sitting next to the user's terminal. You can see their recent terminal output.
 
@@ -100,7 +115,7 @@ function extractRelay(text: string): { relay: string | null; display: string } {
 // ---------------------------------------------------------------------------
 
 export function useSoraCompanion(options: UseSoraCompanionOptions): UseSoraCompanionReturn {
-  const { getActiveSessionId, onSpeak, onBubble } = options
+  const { getActiveSessionId, onSpeak, onBubble, onContextSnapshot } = options
 
   const [messages, setMessages] = useState<ReadonlyArray<ChatMessage>>([])
   const [isStreaming, setIsStreaming] = useState(false)
@@ -110,7 +125,27 @@ export function useSoraCompanion(options: UseSoraCompanionOptions): UseSoraCompa
   const lastOutputTimeRef = useRef(0)
   const charsSinceStatusRef = useRef(0)
   const lastAutoStatusRef = useRef(0)
+  const lastContextSnapshotRef = useRef(0)
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onContextSnapshotRef = useRef(onContextSnapshot)
+  onContextSnapshotRef.current = onContextSnapshot
+
+  /**
+   * Build a compact context snapshot (~200 chars) for the voice agent.
+   * Only includes the tail of the buffer + a signal label.
+   */
+  const emitContextSnapshot = useCallback((signal: string) => {
+    const now = Date.now()
+    if (now - lastContextSnapshotRef.current < CONTEXT_SNAPSHOT_COOLDOWN_MS) return
+    lastContextSnapshotRef.current = now
+
+    // Take last 500 chars of buffer — compact, enough for the agent to understand
+    const tail = bufferRef.current.slice(-500).trim()
+    if (!tail) return
+
+    const snapshot = `[${signal}] Recent terminal:\n${tail}`
+    onContextSnapshotRef.current?.(snapshot)
+  }, [])
 
   // Subscribe to all PTY output
   useEffect(() => {
@@ -123,10 +158,18 @@ export function useSoraCompanion(options: UseSoraCompanionOptions): UseSoraCompa
       lastOutputTimeRef.current = Date.now()
       charsSinceStatusRef.current += clean.length
 
+      // Emit context on high-signal events (errors, completions)
+      if (ERROR_PATTERNS.some(p => p.test(clean))) {
+        emitContextSnapshot('error detected')
+      } else if (COMPLETION_PATTERNS.some(p => p.test(clean))) {
+        emitContextSnapshot('task completed')
+      }
+
       // Reset idle timer
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
       idleTimerRef.current = setTimeout(() => {
         checkAutoStatus()
+        emitContextSnapshot('idle after activity')
       }, IDLE_THRESHOLD_MS)
     })
 
