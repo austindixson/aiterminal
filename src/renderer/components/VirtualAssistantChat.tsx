@@ -12,6 +12,8 @@ import { useState, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { ChatMessage } from '@/types/chat';
 
+type SoraState = 'sleeping' | 'summarizing' | 'listening' | 'relaying';
+
 interface VirtualAssistantChatProps {
   messages: ChatMessage[];
   onSendMessage?: (message: string) => void;
@@ -19,8 +21,7 @@ interface VirtualAssistantChatProps {
   onEndRp?: () => void;
   compact?: boolean;
   onRequestStatus?: () => void;
-  voiceActive?: boolean;
-  onToggleVoice?: () => void;
+  soraState?: SoraState;
 }
 
 /**
@@ -34,8 +35,7 @@ export const VirtualAssistantChat: FC<VirtualAssistantChatProps> = ({
   onEndRp,
   compact = false,
   onRequestStatus,
-  voiceActive = false,
-  onToggleVoice,
+  soraState = 'sleeping',
 }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -106,32 +106,10 @@ export const VirtualAssistantChat: FC<VirtualAssistantChatProps> = ({
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask me anything..."
+            placeholder={soraState === 'listening' ? 'Tell me what to do next...' : soraState === 'sleeping' ? 'Ask Sora anything...' : 'Sora is thinking...'}
             className="virtual-assistant-chat__input-field"
             disabled={isStreaming}
           />
-          {onToggleVoice && (
-            <button
-              type="button"
-              onClick={onToggleVoice}
-              className={`virtual-assistant-chat__voice-btn${voiceActive ? ' virtual-assistant-chat__voice-btn--active' : ''}`}
-              title={voiceActive ? 'End voice call' : 'Start voice call'}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {voiceActive ? (
-                  <>
-                    <path d="M9 9h6v6H9z" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" y1="19" x2="12" y2="23" />
-                  </>
-                )}
-              </svg>
-            </button>
-          )}
           {onRequestStatus && (
             <button
               type="button"

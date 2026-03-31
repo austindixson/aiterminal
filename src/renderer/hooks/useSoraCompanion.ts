@@ -1,9 +1,15 @@
 /**
- * useSoraCompanion — Sora as a real-time terminal companion.
+ * useSoraCompanion — Sora wake/sleep cycle for Claude Code sessions.
  *
- * Watches terminal output, answers questions about the session,
- * relays commands to Claude Code when the user intends it,
- * and auto-generates status updates when Claude finishes a task.
+ * SLEEP: Sora monitors terminal output silently.
+ * WAKE:  When Claude finishes a task (idle after activity), Sora:
+ *        1. Summarizes what Claude just did
+ *        2. Asks "What do you want to do next?"
+ *        3. Waits for user response (text or voice)
+ *        4. Relays the response to Claude Code via terminal
+ *        5. Goes back to sleep
+ *
+ * Also supports manual text input and status requests at any time.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
@@ -13,9 +19,12 @@ import type { ChatMessage } from '@/types/chat'
 // Types
 // ---------------------------------------------------------------------------
 
+export type SoraState = 'sleeping' | 'summarizing' | 'listening' | 'relaying'
+
 export interface UseSoraCompanionReturn {
   readonly messages: ReadonlyArray<ChatMessage>
   readonly isStreaming: boolean
+  readonly soraState: SoraState
   readonly sendMessage: (text: string) => Promise<void>
   readonly generateStatus: () => Promise<void>
   readonly clearMessages: () => void
@@ -25,8 +34,6 @@ export interface UseSoraCompanionOptions {
   readonly getActiveSessionId: () => string | null
   readonly onSpeak?: (text: string) => void
   readonly onBubble?: (text: string) => void
-  /** Called at strategic moments with a compact context snapshot (for voice agent). */
-  readonly onContextSnapshot?: (context: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -35,24 +42,20 @@ export interface UseSoraCompanionOptions {
 
 const MAX_BUFFER = 2000
 const MAX_MESSAGES = 30
-const AUTO_STATUS_COOLDOWN_MS = 60_000
+const AUTO_STATUS_COOLDOWN_MS = 30_000
 const IDLE_THRESHOLD_MS = 5_000
 const ACTIVITY_CHAR_THRESHOLD = 500
-const CONTEXT_SNAPSHOT_COOLDOWN_MS = 15_000
 
-// High-signal patterns worth pushing context for
-const ERROR_PATTERNS = [
-  /\berror\b/i, /\bfailed\b/i, /\bfailure\b/i, /\bpanic\b/i,
-  /command not found/i, /permission denied/i, /not recognized/i,
-  /FAIL/,
-]
-const COMPLETION_PATTERNS = [
-  /\bpassed\b/i, /\bcomplete[d]?\b/i, /\bsuccess\b/i, /\bdone\b/i,
-  /\bfinished\b/i, /tests? (?:passed|ok)\b/i, /build succeeded/i,
-  /✓/, /✅/,
-]
+const STATUS_AND_PROMPT = `Based on the recent terminal output below, do TWO things:
+1. Summarize what just happened in 1-2 sentences (be specific — file names, test results, errors)
+2. End with: "What would you like to do next?"
 
-const SORA_SYSTEM_PROMPT = `You are Sora, a friendly AI companion sitting next to the user's terminal. You can see their recent terminal output.
+TERMINAL OUTPUT:
+---
+{TERMINAL_BUFFER}
+---`
+
+const SORA_SYSTEM_PROMPT = `You are Sora, a friendly AI companion watching the user's terminal.
 
 RECENT TERMINAL OUTPUT:
 ---
@@ -61,21 +64,11 @@ RECENT TERMINAL OUTPUT:
 
 You can:
 1. Answer questions about what's happening in the terminal or the project
-2. Chat casually about anything — architecture, ideas, opinions
-3. Relay commands to Claude Code or the terminal — wrap EXACTLY what should be typed in [RELAY]command here[/RELAY] tags
+2. Chat casually — architecture, ideas, opinions
+3. Relay commands to Claude Code — wrap what should be typed in [RELAY]command[/RELAY]
 
-Only use [RELAY] when the user clearly wants something executed or sent to the terminal/Claude. For questions, opinions, status updates — just answer directly.
-
-Keep responses to 1-3 sentences. Be natural and conversational.`
-
-const STATUS_PROMPT = `Based on the recent terminal output below, give a brief 1-2 sentence status update on what just happened.
-
-TERMINAL OUTPUT:
----
-{TERMINAL_BUFFER}
----
-
-Be specific — mention file names, test results, errors, or commands that ran. If nothing significant happened, say so.`
+Only use [RELAY] when the user clearly wants Claude to do something. For questions and chat, just answer.
+Keep responses to 1-3 sentences.`
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -107,7 +100,7 @@ function extractRelay(text: string): { relay: string | null; display: string } {
 
   const relay = match[1].trim()
   const display = text.replace(/\[RELAY\][\s\S]*?\[\/RELAY\]/, '').trim()
-  return { relay, display: display || `Sending to terminal: \`${relay}\`` }
+  return { relay, display: display || `Sent to Claude: "${relay}"` }
 }
 
 // ---------------------------------------------------------------------------
@@ -115,85 +108,26 @@ function extractRelay(text: string): { relay: string | null; display: string } {
 // ---------------------------------------------------------------------------
 
 export function useSoraCompanion(options: UseSoraCompanionOptions): UseSoraCompanionReturn {
-  const { getActiveSessionId, onSpeak, onBubble, onContextSnapshot } = options
+  const { getActiveSessionId, onSpeak, onBubble } = options
 
   const [messages, setMessages] = useState<ReadonlyArray<ChatMessage>>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const [soraState, setSoraState] = useState<SoraState>('sleeping')
 
   // Terminal buffer (rolling, ANSI-stripped)
   const bufferRef = useRef('')
   const lastOutputTimeRef = useRef(0)
-  const charsSinceStatusRef = useRef(0)
-  const lastAutoStatusRef = useRef(0)
-  const lastContextSnapshotRef = useRef(0)
+  const charsSinceWakeRef = useRef(0)
+  const lastWakeTimeRef = useRef(0)
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const onContextSnapshotRef = useRef(onContextSnapshot)
-  onContextSnapshotRef.current = onContextSnapshot
+  const soraStateRef = useRef<SoraState>('sleeping')
+  soraStateRef.current = soraState
 
-  /**
-   * Build a compact context snapshot (~200 chars) for the voice agent.
-   * Only includes the tail of the buffer + a signal label.
-   */
-  const emitContextSnapshot = useCallback((signal: string) => {
-    const now = Date.now()
-    if (now - lastContextSnapshotRef.current < CONTEXT_SNAPSHOT_COOLDOWN_MS) return
-    lastContextSnapshotRef.current = now
-
-    // Take last 500 chars of buffer — compact, enough for the agent to understand
-    const tail = bufferRef.current.slice(-500).trim()
-    if (!tail) return
-
-    const snapshot = `[${signal}] Recent terminal:\n${tail}`
-    onContextSnapshotRef.current?.(snapshot)
-  }, [])
-
-  // Subscribe to all PTY output
-  useEffect(() => {
-    const api = window.electronAPI
-    if (!api?.onAnySessionData) return
-
-    const unsub = api.onAnySessionData((_sessionId, data) => {
-      const clean = stripAnsi(data)
-      bufferRef.current = (bufferRef.current + clean).slice(-MAX_BUFFER)
-      lastOutputTimeRef.current = Date.now()
-      charsSinceStatusRef.current += clean.length
-
-      // Emit context on high-signal events (errors, completions)
-      if (ERROR_PATTERNS.some(p => p.test(clean))) {
-        emitContextSnapshot('error detected')
-      } else if (COMPLETION_PATTERNS.some(p => p.test(clean))) {
-        emitContextSnapshot('task completed')
-      }
-
-      // Reset idle timer
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
-      idleTimerRef.current = setTimeout(() => {
-        checkAutoStatus()
-        emitContextSnapshot('idle after activity')
-      }, IDLE_THRESHOLD_MS)
-    })
-
-    return () => {
-      unsub?.()
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-status when Claude goes idle after activity
-  const checkAutoStatus = useCallback(() => {
-    const now = Date.now()
-    const cooldownOk = now - lastAutoStatusRef.current > AUTO_STATUS_COOLDOWN_MS
-    const enoughActivity = charsSinceStatusRef.current > ACTIVITY_CHAR_THRESHOLD
-    const buffer = bufferRef.current.trim()
-
-    if (!cooldownOk || !enoughActivity || buffer.length < 100) return
-
-    lastAutoStatusRef.current = now
-    charsSinceStatusRef.current = 0
-
-    // Fire and forget — generate status in background
-    generateStatusInternal()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Stable refs for callbacks (avoid stale closures)
+  const onSpeakRef = useRef(onSpeak)
+  onSpeakRef.current = onSpeak
+  const onBubbleRef = useRef(onBubble)
+  onBubbleRef.current = onBubble
 
   // ---------------------------------------------------------------------------
   // AI query helper
@@ -207,16 +141,16 @@ export function useSoraCompanion(options: UseSoraCompanionOptions): UseSoraCompa
     const api = window.electronAPI
     if (!api?.aiQueryStream) return '(AI not available)'
 
-    const prompt = systemPrompt.replace('{TERMINAL_BUFFER}', bufferRef.current)
+    const prompt = systemPrompt.replace('{TERMINAL_BUFFER}', bufferRef.current.slice(-1500))
 
     return new Promise<string>((resolve) => {
       let accumulated = ''
 
       api.aiQueryStream(
         {
-          prompt: `${prompt}\n\nUser: ${userText}`,
+          prompt: userText ? `${prompt}\n\nUser: ${userText}` : prompt,
           taskType: 'general',
-          context: context.slice(-10).map(m => ({
+          context: context.slice(-6).map(m => ({
             role: m.role as 'user' | 'assistant',
             content: m.content,
           })),
@@ -224,24 +158,95 @@ export function useSoraCompanion(options: UseSoraCompanionOptions): UseSoraCompa
         (payload) => {
           if (payload.chunk) accumulated += payload.chunk
           if (payload.done) resolve(accumulated.trim())
-          if (payload.error) resolve(`Sorry, I hit an error: ${payload.error}`)
+          if (payload.error) resolve(`Sorry, something went wrong.`)
         },
       )
     })
   }, [])
 
   // ---------------------------------------------------------------------------
-  // Send message
+  // Wake cycle: summarize → listen → relay → sleep
+  // ---------------------------------------------------------------------------
+
+  const wake = useCallback(async () => {
+    if (soraStateRef.current !== 'sleeping') return
+    if (isStreaming) return
+
+    const now = Date.now()
+    if (now - lastWakeTimeRef.current < AUTO_STATUS_COOLDOWN_MS) return
+    lastWakeTimeRef.current = now
+
+    setSoraState('summarizing')
+    setIsStreaming(true)
+
+    try {
+      const response = await queryAI(STATUS_AND_PROMPT, '', [])
+      const statusMsg = createMsg('assistant', response)
+      setMessages(prev => [...prev, statusMsg].slice(-MAX_MESSAGES))
+      onSpeakRef.current?.(response)
+      onBubbleRef.current?.(response)
+
+      // Now listening for user response
+      setSoraState('listening')
+    } catch {
+      setSoraState('sleeping')
+    } finally {
+      setIsStreaming(false)
+    }
+
+    charsSinceWakeRef.current = 0
+  }, [isStreaming, queryAI])
+
+  // ---------------------------------------------------------------------------
+  // Subscribe to PTY output
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    const api = window.electronAPI
+    if (!api?.onAnySessionData) return
+
+    const unsub = api.onAnySessionData((_sessionId, data) => {
+      const clean = stripAnsi(data)
+      bufferRef.current = (bufferRef.current + clean).slice(-MAX_BUFFER)
+      lastOutputTimeRef.current = Date.now()
+      charsSinceWakeRef.current += clean.length
+
+      // Only track idle when sleeping (don't wake during user interaction)
+      if (soraStateRef.current !== 'sleeping') return
+
+      // Reset idle timer
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = setTimeout(() => {
+        // Wake if enough activity happened since last wake
+        if (charsSinceWakeRef.current > ACTIVITY_CHAR_THRESHOLD) {
+          wake()
+        }
+      }, IDLE_THRESHOLD_MS)
+    })
+
+    return () => {
+      unsub?.()
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    }
+  }, [wake])
+
+  // ---------------------------------------------------------------------------
+  // Send message (user response or manual input)
   // ---------------------------------------------------------------------------
 
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || isStreaming) return
 
-    // Add user message
     const userMsg = createMsg('user', trimmed)
     setMessages(prev => [...prev, userMsg].slice(-MAX_MESSAGES))
     setIsStreaming(true)
+
+    // If Sora was listening (wake cycle), this is the user's next task
+    const wasListening = soraStateRef.current === 'listening'
+    if (wasListening) {
+      setSoraState('relaying')
+    }
 
     try {
       const context = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }))
@@ -249,7 +254,6 @@ export function useSoraCompanion(options: UseSoraCompanionOptions): UseSoraCompa
 
       const { relay, display } = extractRelay(response)
 
-      // If Sora decided to relay, write to terminal
       if (relay) {
         const sessionId = getActiveSessionId()
         if (sessionId && window.electronAPI?.writeToSession) {
@@ -259,52 +263,55 @@ export function useSoraCompanion(options: UseSoraCompanionOptions): UseSoraCompa
 
       const assistantMsg = createMsg('assistant', display)
       setMessages(prev => [...prev, assistantMsg].slice(-MAX_MESSAGES))
+      onSpeakRef.current?.(display)
+      onBubbleRef.current?.(display)
 
-      // TTS + speech bubble
-      onSpeak?.(display)
-      onBubble?.(display)
+      // After relaying, go back to sleep
+      if (relay || wasListening) {
+        setSoraState('sleeping')
+      }
     } catch {
       const errMsg = createMsg('assistant', 'Sorry, something went wrong.')
       setMessages(prev => [...prev, errMsg].slice(-MAX_MESSAGES))
+      setSoraState('sleeping')
     } finally {
       setIsStreaming(false)
     }
-  }, [isStreaming, messages, queryAI, getActiveSessionId, onSpeak, onBubble])
+  }, [isStreaming, messages, queryAI, getActiveSessionId])
 
   // ---------------------------------------------------------------------------
-  // Generate status
+  // Manual status (always available)
   // ---------------------------------------------------------------------------
-
-  const generateStatusInternal = useCallback(async () => {
-    if (isStreaming) return
-
-    setIsStreaming(true)
-    try {
-      const response = await queryAI(STATUS_PROMPT, '', [])
-      const statusMsg = createMsg('assistant', response)
-      setMessages(prev => [...prev, statusMsg].slice(-MAX_MESSAGES))
-      onSpeak?.(response)
-      onBubble?.(response)
-    } catch {
-      // Silent fail for auto-status
-    } finally {
-      setIsStreaming(false)
-    }
-  }, [isStreaming, queryAI, onSpeak, onBubble])
 
   const generateStatus = useCallback(async () => {
-    charsSinceStatusRef.current = 0
-    lastAutoStatusRef.current = Date.now()
-    await generateStatusInternal()
-  }, [generateStatusInternal])
+    lastWakeTimeRef.current = Date.now()
+    charsSinceWakeRef.current = 0
+
+    setSoraState('summarizing')
+    setIsStreaming(true)
+    try {
+      const response = await queryAI(STATUS_AND_PROMPT, '', [])
+      const statusMsg = createMsg('assistant', response)
+      setMessages(prev => [...prev, statusMsg].slice(-MAX_MESSAGES))
+      onSpeakRef.current?.(response)
+      onBubbleRef.current?.(response)
+      setSoraState('listening')
+    } catch {
+      setSoraState('sleeping')
+    } finally {
+      setIsStreaming(false)
+    }
+  }, [queryAI])
 
   const clearMessages = useCallback(() => {
     setMessages([])
+    setSoraState('sleeping')
   }, [])
 
   return {
     messages,
     isStreaming,
+    soraState,
     sendMessage,
     generateStatus,
     clearMessages,

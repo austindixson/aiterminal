@@ -187,7 +187,6 @@ export const App: FC = () => {
 
   // RP Mode: fullscreen VRM with ElevenLabs conversational agent
   const [rpMode, setRpMode] = useState(false)
-  const [voiceActive, setVoiceActive] = useState(false)
   const elevenAgent = useElevenLabsAgent()
 
   // TTS toggle: mute/unmute text-to-speech
@@ -210,30 +209,12 @@ export const App: FC = () => {
     }
   }, [backendSelector.activeBackend, tuiMode])
 
-  // Sora companion — terminal-aware conversational AI
-  const voiceActiveRef = useRef(false)
-  voiceActiveRef.current = voiceActive
+  // Sora companion — wake/sleep cycle for Claude Code sessions
   const soraCompanion = useSoraCompanion({
     getActiveSessionId: () => terminalTabs.getActiveSessionId(),
     onSpeak: (text) => { voice.speak(text).catch(() => {}) },
     onBubble: (text) => { speechBubbles.addBubble(text) },
-    onContextSnapshot: (ctx) => {
-      // Only push to ElevenLabs agent when voice call is active
-      if (voiceActiveRef.current) elevenAgent.sendContext(ctx)
-    },
   })
-
-  // Silence keepalive — tell ElevenLabs agent the user is coding, not gone.
-  // Fires every 45s during voice call to prevent "are you still there?" prompts.
-  useEffect(() => {
-    if (!voiceActive) return
-    const interval = setInterval(() => {
-      elevenAgent.sendContext(
-        'The user is actively coding in silence. Do NOT ask if they are there. Stay quiet until they speak or something notable happens in the terminal.'
-      )
-    }, 45_000)
-    return () => clearInterval(interval)
-  }, [voiceActive, elevenAgent])
 
   // Active terminal session cwd (file tree + picker); derived from active tab
   const activeTabCwd = useMemo(() => {
@@ -1207,7 +1188,7 @@ export const App: FC = () => {
 
                 {/* Virtual Assistant Chat - transparent overlay inside avatar container */}
                 <VirtualAssistantChat
-                  messages={(rpMode || voiceActive)
+                  messages={rpMode
                     ? elevenAgent.messages.map((m, i) => ({
                         id: `agent-${i}`,
                         role: m.role === 'agent' ? 'assistant' as const : 'user' as const,
@@ -1216,27 +1197,18 @@ export const App: FC = () => {
                       }))
                     : soraCompanion.messages as ChatMessage[]
                   }
-                  onSendMessage={(rpMode || voiceActive)
+                  onSendMessage={rpMode
                     ? (msg) => elevenAgent.sendText(msg)
                     : (msg) => soraCompanion.sendMessage(msg)
                   }
-                  isStreaming={(rpMode || voiceActive) ? elevenAgent.isSpeaking : soraCompanion.isStreaming}
+                  isStreaming={rpMode ? elevenAgent.isSpeaking : soraCompanion.isStreaming}
                   onEndRp={rpMode ? async () => {
                     setRpMode(false);
                     await elevenAgent.stop();
                   } : undefined}
                   compact={!rpMode}
-                  onRequestStatus={(rpMode || voiceActive) ? undefined : () => soraCompanion.generateStatus()}
-                  voiceActive={voiceActive}
-                  onToggleVoice={rpMode ? undefined : async () => {
-                    if (voiceActive) {
-                      setVoiceActive(false)
-                      await elevenAgent.stop()
-                    } else {
-                      setVoiceActive(true)
-                      await elevenAgent.start()
-                    }
-                  }}
+                  onRequestStatus={rpMode ? undefined : () => soraCompanion.generateStatus()}
+                  soraState={rpMode ? undefined : soraCompanion.soraState}
                 />
               </div>
             </div>
