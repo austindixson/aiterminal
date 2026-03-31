@@ -187,6 +187,7 @@ export const App: FC = () => {
 
   // RP Mode: fullscreen VRM with ElevenLabs conversational agent
   const [rpMode, setRpMode] = useState(false)
+  const [voiceActive, setVoiceActive] = useState(false)
   const elevenAgent = useElevenLabsAgent()
 
   // TTS toggle: mute/unmute text-to-speech
@@ -1188,7 +1189,7 @@ export const App: FC = () => {
 
                 {/* Virtual Assistant Chat - transparent overlay inside avatar container */}
                 <VirtualAssistantChat
-                  messages={rpMode
+                  messages={(rpMode || voiceActive)
                     ? elevenAgent.messages.map((m, i) => ({
                         id: `agent-${i}`,
                         role: m.role === 'agent' ? 'assistant' as const : 'user' as const,
@@ -1197,17 +1198,27 @@ export const App: FC = () => {
                       }))
                     : soraCompanion.messages as ChatMessage[]
                   }
-                  onSendMessage={rpMode
+                  onSendMessage={(rpMode || voiceActive)
                     ? (msg) => elevenAgent.sendText(msg)
                     : (msg) => soraCompanion.sendMessage(msg)
                   }
-                  isStreaming={rpMode ? elevenAgent.isSpeaking : soraCompanion.isStreaming}
+                  isStreaming={(rpMode || voiceActive) ? elevenAgent.isSpeaking : soraCompanion.isStreaming}
                   onEndRp={rpMode ? async () => {
                     setRpMode(false);
                     await elevenAgent.stop();
                   } : undefined}
                   compact={!rpMode}
-                  onRequestStatus={rpMode ? undefined : () => soraCompanion.generateStatus()}
+                  onRequestStatus={(rpMode || voiceActive) ? undefined : () => soraCompanion.generateStatus()}
+                  voiceActive={voiceActive}
+                  onToggleVoice={rpMode ? undefined : async () => {
+                    if (voiceActive) {
+                      setVoiceActive(false)
+                      await elevenAgent.stop()
+                    } else {
+                      setVoiceActive(true)
+                      await elevenAgent.start()
+                    }
+                  }}
                 />
               </div>
             </div>

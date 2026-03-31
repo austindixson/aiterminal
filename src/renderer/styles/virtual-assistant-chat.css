@@ -362,3 +362,46 @@
   font-size: 9px;
   margin-top: 4px;
 }
+
+/* Voice call button */
+.virtual-assistant-chat__voice-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #8b8eff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.virtual-assistant-chat__voice-btn:hover {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.virtual-assistant-chat__voice-btn--active {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+  animation: voice-pulse 2s ease-in-out infinite;
+}
+
+.virtual-assistant-chat__voice-btn--active:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: rgba(239, 68, 68, 0.7);
+}
+
+@keyframes voice-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+.virtual-assistant-chat--compact .virtual-assistant-chat__voice-btn {
+  width: 32px;
+  height: 32px;
+}
