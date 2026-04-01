@@ -1006,9 +1006,11 @@ export function useChat(): UseChatReturn {
             processMemoryTags(memoryText)
 
             // ---------------------------------------------------------------
-            // NATIVE TOOL CALL EXECUTION (batched, sequential, single continuation)
+            // NATIVE TOOL CALL EXECUTION (executed in ALL modes, loop only in autocode)
             // ---------------------------------------------------------------
-            if (hadNativeToolCalls && chatMode === 'autocode' && agentLoopActiveRef.current) {
+            if (hadNativeToolCalls) {
+              // Doom loop detection only applies to autocode mode
+              if (chatMode === 'autocode' && agentLoopActiveRef.current) {
               // Doom loop detection: if the EXACT same batch of tool calls repeats
               // 3 consecutive times, stop. Different batches reset the counter.
               const batchSig = nativeToolCalls.map(tc => `${tc.name}:${JSON.stringify(tc.arguments)}`).sort().join('|')
@@ -1031,9 +1033,12 @@ export function useChat(): UseChatReturn {
                     m.id === placeholderId ? { ...m, content: afterRunTags } : m,
                   ),
                 )
+                // Skip tool execution on doom loop
+                return
               }
-            }
-            if (hadNativeToolCalls && chatMode === 'autocode' && agentLoopActiveRef.current) {
+              }
+
+              // Execute tool calls in ALL modes when native tool calls are present
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === placeholderId ? { ...m, content: afterRunTags } : m,
@@ -1203,41 +1208,34 @@ export function useChat(): UseChatReturn {
                 )
               }
 
-              // Check if AI signaled completion
-              const isDone = /(?:task|everything|all\s+\w+\s+is)\s+(?:complete|done|finished)|^complete\.?$/im.test(accumulated)
-              if (isDone) {
-                console.log('[AgentLoop] STOPPING — AI signaled completion (native path)')
-                setAgentLoopActive(false)
-              }
-
-              // Send ONE batched continuation with all results (full context for model)
-              if (agentLoopActiveRef.current && modelParts.length > 0) {
-                agentLoopIterationsRef.current++
-                if (agentLoopIterationsRef.current < MAX_AGENT_ITERATIONS) {
-                  console.log(`[AgentLoop] Native continuation #${agentLoopIterationsRef.current} with ${modelParts.length} results`)
-                  // Include action history so model doesn't repeat completed actions
-                  const historyContext = actionLogRef.current.length > 0
-                    ? `\n\nActions completed so far:\n${actionLogRef.current.map(a => `- ${a}`).join('\n')}\n\nDo NOT repeat actions already completed.`
-                    : ''
-                  const continuation = modelParts.join('\n\n') + historyContext + '\n\nBriefly note the results, then continue with the next step. If done, say "Complete."'
-                  setTimeout(() => {
-                    if (agentLoopActiveRef.current) {
-                      sendMessageInternal(continuation)
-                    }
-                  }, 300)
-                } else {
-                  console.log(`[AgentLoop] Max iterations (${MAX_AGENT_ITERATIONS}) reached — stopping`)
+              // Send ONE batched continuation with all results (full context for model) - ONLY in autocode mode
+              if (chatMode === 'autocode' && agentLoopActiveRef.current && modelParts.length > 0) {
+                // Check if AI signaled completion
+                const isDone = /(?:task|everything|all\s+\w+\s+is)\s+(?:complete|done|finished)|^complete\.?$/im.test(accumulated)
+                if (isDone) {
+                  console.log('[AgentLoop] STOPPING — AI signaled completion (native path)')
                   setAgentLoopActive(false)
+                } else {
+                  agentLoopIterationsRef.current++
+                  if (agentLoopIterationsRef.current < MAX_AGENT_ITERATIONS) {
+                    console.log(`[AgentLoop] Native continuation #${agentLoopIterationsRef.current} with ${modelParts.length} results`)
+                    // Include action history so model doesn't repeat completed actions
+                    const historyContext = actionLogRef.current.length > 0
+                      ? `\n\nActions completed so far:\n${actionLogRef.current.map(a => `- ${a}`).join('\n')}\n\nDo NOT repeat actions already completed.`
+                      : ''
+                    const continuation = modelParts.join('\n\n') + historyContext + '\n\nBriefly note the results, then continue with the next step. If done, say "Complete."'
+                    setTimeout(() => {
+                      if (agentLoopActiveRef.current) {
+                        sendMessageInternal(continuation)
+                      }
+                    }, 300)
+                  } else {
+                    console.log(`[AgentLoop] Max iterations (${MAX_AGENT_ITERATIONS}) reached — stopping`)
+                    setAgentLoopActive(false)
+                  }
                 }
               }
-            } else if (hadNativeToolCalls) {
-              // Non-autocode mode with native tool calls — just display, no loop
-              const { text: finalContent } = { text: afterRunTags }
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === placeholderId ? { ...m, content: finalContent } : m,
-                ),
-              )
+              // Normal/Plan mode: Tools executed, results displayed. Don't auto-continue - wait for user input.
             } else {
               // ---------------------------------------------------------------
               // TEXT-TAG FALLBACK (models without function calling)

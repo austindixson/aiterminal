@@ -30,9 +30,22 @@ coverage/
 # Logs
 *.log
 npm-debug.log*
+daemon-error.log
+daemon-output.log
 
 # Electron builder
 *.dmg
 *.snap
 *.AppImage
 .env.bak
+
+# Temporary files
+path
+test-*.html
+*.tmp
+
+# Worktrees
+.claude/worktrees/
+
+# Untracked user data
+Users/

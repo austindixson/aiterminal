@@ -18,4 +18,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+
+  // Run setup before all tests
+  // globalSetup: './e2e/global-setup.ts',
 });
