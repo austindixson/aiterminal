@@ -629,6 +629,6 @@ AITERMINAL_DEFAULT_CODING_AGENT=claude
 ## References
 
 - **OpenClaw Agent Loop:** https://github.com/openclaw/openclaw/blob/main/docs/concepts/agent-loop.md
-- **Lossless Recall:** https://github.com/RuneweaverStudios/lossless-claude
+- **Lossless Recall:** https://github.com/austindixson/lossless-claude
 - **Claude Code:** https://claude.ai/code
 - **hotAsianIntern Skill:** `~/.claude/skills/hotAsianIntern/SKILL.md`
